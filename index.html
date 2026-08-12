@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Producto — Territoria (v0.1)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0e1116; --grid:#1a1f28; --panel:#161b22; --linea:#2a3341;
+    --tinta:#e6edf3; --tinta-2:#9aa7b5; --tinta-3:#6b7684;
+    --vivo:#2f9e44; --vivo-glow:rgba(47,158,68,.35);
+    --obra:#d9a406; --obra-glow:rgba(217,164,6,.32);
+    --idea:#3d4a5c; --idea-glow:rgba(90,110,140,.28);
+    --ruido:#e5484d; --ruido-glow:rgba(229,72,77,.4);
+    --cable:#3a4757; --cable-activo:#5b7fb5;
+  }
+  html,body{height:100%;overflow:hidden;background:var(--bg);
+    font-family:'SF Pro Text',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--tinta)}
+  #viewport{position:fixed;inset:0;cursor:grab;
+    background-image:radial-gradient(var(--grid) 1px,transparent 1px);
+    background-size:26px 26px}
+  #viewport.panning{cursor:grabbing}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0}
+  svg#cables{position:absolute;top:0;left:0;overflow:visible;pointer-events:none}
+  .cable{fill:none;transition:stroke .2s,stroke-width .2s}
+  .cable.sec{stroke:var(--cable);stroke-width:1.6;stroke-dasharray:5 5}
+  .cable.vital{stroke:#5bd0ff;stroke-width:3.4;
+    filter:drop-shadow(0 0 4px rgba(91,208,255,.55))}
+  .cable:hover{cursor:pointer}
+  .cable-lbl{font-size:11px;font-weight:600;paint-order:stroke;
+    stroke:var(--bg);stroke-width:4px;cursor:pointer}
+  .cable-lbl.sec{fill:var(--tinta-3)}
+  .cable-lbl.vital{fill:#8fdcff;font-weight:700}
+
+  .node{position:absolute;width:210px;background:var(--panel);
+    border:1.5px solid var(--linea);border-radius:14px;padding:13px 14px;
+    cursor:grab;user-select:none;box-shadow:0 6px 20px rgba(0,0,0,.35);
+    transition:border-color .15s,transform .08s,box-shadow .15s}
+  .node:active{cursor:grabbing}
+  .node:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.5)}
+  .node.vivo{border-color:var(--vivo)}
+  .node.vivo:hover{box-shadow:0 0 0 3px var(--vivo-glow),0 10px 28px rgba(0,0,0,.5)}
+  .node.obra{border-color:var(--obra)}
+  .node.obra:hover{box-shadow:0 0 0 3px var(--obra-glow),0 10px 28px rgba(0,0,0,.5)}
+  .node.idea{border-color:var(--idea);border-style:dashed}
+  .node.idea:hover{box-shadow:0 0 0 3px var(--idea-glow),0 10px 28px rgba(0,0,0,.5)}
+
+  .node .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .node .ic{font-size:17px;line-height:1}
+  .node h3{font-size:14.5px;font-weight:700;letter-spacing:-.01em;flex:1}
+  .node .rol{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--tinta-3);margin-bottom:9px}
+  .node .barra{display:flex;align-items:center;gap:9px}
+  .madurez{display:flex;gap:4px;align-items:center}
+  .madurez .dot{width:8px;height:8px;border-radius:50%;background:var(--linea)}
+  .madurez .dot.on{background:var(--tinta-2)}
+  .madurez .lbl{font-size:9px;color:var(--tinta-3);margin-left:3px;letter-spacing:.03em}
+  .drill{margin-left:auto;font-size:10px;font-weight:800;color:var(--cable-activo);
+    background:rgba(91,127,181,.12);padding:2px 7px;border-radius:6px}
+  .ruido-badge{position:absolute;top:-9px;right:-9px;background:var(--ruido);color:#fff;
+    font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;
+    box-shadow:0 0 0 3px var(--ruido-glow);letter-spacing:.03em}
+
+  /* tooltip */
+  #tip{position:fixed;z-index:50;width:310px;background:#0b0e13;
+    border:1px solid var(--linea);border-radius:12px;padding:14px 15px;
+    box-shadow:0 12px 34px rgba(0,0,0,.6);pointer-events:none;opacity:0;
+    transition:opacity .12s}
+  #tip.show{opacity:1}
+  #tip .t-head{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;
+    letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-3);
+    padding-bottom:9px;margin-bottom:10px;border-bottom:1px solid var(--linea)}
+  #tip .t-head .t-ic{font-size:15px}
+  #tip .t-field{margin-bottom:10px}
+  #tip .t-field:last-of-type{margin-bottom:0}
+  #tip .t-lbl{display:block;font-size:9px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;margin-bottom:3px}
+  #tip .t-field.f-why  .t-lbl{color:#7fa8e0}
+  #tip .t-field.f-what .t-lbl{color:var(--tinta-3)}
+  #tip .t-field.f-how  .t-lbl{color:var(--tinta-3)}
+  #tip .t-field.f-goal .t-lbl{color:#6cc48a}
+  #tip .t-field p{color:var(--tinta-2);font-size:12.5px;line-height:1.45}
+  #tip .t-ruido{color:#ff9ea1;margin-top:11px;font-weight:600;font-size:12px;line-height:1.45;
+    border-top:1px solid var(--linea);padding-top:9px}
+
+  /* chrome */
+  #hud{position:fixed;top:16px;left:18px;z-index:40}
+  #hud h1{font-size:16px;font-weight:800;letter-spacing:-.02em}
+  #hud .sub{font-size:11.5px;color:var(--tinta-3);margin-top:2px}
+  #crumb{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:40;
+    display:flex;align-items:center;gap:7px;background:var(--panel);
+    border:1px solid var(--linea);border-radius:10px;padding:7px 13px;font-size:12.5px}
+  #crumb button{background:none;border:none;color:var(--cable-activo);font-weight:700;
+    cursor:pointer;font-size:12.5px}
+  #crumb .sep{color:var(--tinta-3)}
+  #crumb .cur{color:var(--tinta);font-weight:700}
+
+  #legend{position:fixed;bottom:16px;left:18px;z-index:40;background:var(--panel);
+    border:1px solid var(--linea);border-radius:12px;padding:12px 14px;font-size:11.5px;max-width:250px}
+  #legend .lg-t{font-weight:800;font-size:10.5px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--tinta-3);margin-bottom:8px}
+  #legend .lg-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;color:var(--tinta-2)}
+  #legend .sw{width:13px;height:13px;border-radius:4px;border:1.5px solid}
+  #legend .sw.vivo{border-color:var(--vivo);background:var(--vivo-glow)}
+  #legend .sw.obra{border-color:var(--obra);background:var(--obra-glow)}
+  #legend .sw.idea{border-color:var(--idea);border-style:dashed;background:var(--idea-glow)}
+  #legend .sw.ruido{border-color:var(--ruido);background:var(--ruido-glow)}
+  #legend .ln{width:16px;height:0;flex-shrink:0}
+  #legend .ln.vital{border-top:3px solid #5bd0ff}
+  #legend .ln.sec{border-top:1.6px dashed var(--cable)}
+  #legend .lg-hint{margin-top:9px;padding-top:8px;border-top:1px solid var(--linea);
+    color:var(--tinta-3);font-size:10.5px;line-height:1.5}
+
+  #legend{position:fixed;transition:opacity .15s,transform .15s}
+  #legend.collapsed{opacity:0;transform:translateX(-12px);pointer-events:none}
+  #legend-close{position:absolute;top:9px;right:9px;width:22px;height:22px;
+    background:var(--bg);border:1px solid var(--linea);border-radius:6px;color:var(--tinta-3);
+    cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center}
+  #legend-close:hover{color:var(--tinta);border-color:var(--cable-activo)}
+  #legend-tab{position:fixed;bottom:16px;left:18px;z-index:41;width:40px;height:40px;
+    background:var(--panel);border:1px solid var(--linea);border-radius:11px;color:var(--tinta-2);
+    font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;
+    box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #legend-tab.show{display:flex}
+  #legend-tab:hover{border-color:var(--cable-activo);color:var(--tinta)}
+
+  #zoomhud{position:fixed;bottom:16px;right:18px;z-index:40;display:flex;gap:6px}
+  #zoomhud button{width:34px;height:34px;background:var(--panel);border:1px solid var(--linea);
+    border-radius:9px;color:var(--tinta);font-size:17px;cursor:pointer;font-weight:600}
+  #zoomhud button:hover{border-color:var(--cable-activo)}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <h1>🗺️ Mapa de Producto · Territoria</h1>
+  <div class="sub">v0.5 · +Cotizador, Pago integrado y Recordatorios — las líneas gruesas y brillantes son <b style="color:#8fdcff">arterias vitales</b> · hover en nodo o en línea para el detalle</div>
+</div>
+
+<div id="crumb"><span class="cur" id="crumb-cur">Vista general</span></div>
+
+<div id="viewport">
+  <div id="world">
+    <svg id="cables"></svg>
+    <!-- nodos inyectados por JS -->
+  </div>
+</div>
+
+<div id="tip"></div>
+
+<div id="legend">
+  <button id="legend-close" title="Ocultar leyenda">‹</button>
+  <div class="lg-t">Estado</div>
+  <div class="lg-row"><span class="sw vivo"></span> Vivo — construido y funciona</div>
+  <div class="lg-row"><span class="sw obra"></span> En obra — existe a medias</div>
+  <div class="lg-row"><span class="sw idea"></span> Frontera — por construir</div>
+  <div class="lg-row"><span class="sw ruido"></span> Hace ruido — revisar</div>
+  <div class="lg-t" style="margin-top:12px">Conexiones</div>
+  <div class="lg-row"><span class="ln vital"></span> Vital — si se corta, se cae lo de abajo</div>
+  <div class="lg-row"><span class="ln sec"></span> Secundaria — ayuda, no es crítica</div>
+  <div class="lg-hint">Los <b>puntos</b> en cada nodo = madurez: reglas → patrones → IA. Pasá el mouse por una <b>línea</b> para ver por qué es vital o no.</div>
+</div>
+
+<button id="legend-tab" title="Mostrar leyenda">ℹ</button>
+
+<div id="zoomhud">
+  <button id="zout">−</button><button id="zin">+</button><button id="zreset">⤢</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// MODELO — data-driven. Cada vista = nodos + cables. Drill-down navega vistas.
+// atributos por nodo: que(hover) · estado(vivo/obra/idea) · madurez(1-3 nivel actual)
+//                     · ruido(texto|null) · rol · valor · drill(id de vista hija|null)
+// ─────────────────────────────────────────────────────────────
+const VISTAS = {
+  root: {
+    titulo: "Vista general", parent:null,
+    nodes: {
+      plataforma: { x:80,  y:300, ic:"⚙️", label:"Plataforma / Admin", rol:"Admin", estado:"vivo", madurez:1, drill:"plataforma",
+        necesidad:"El vendedor no puede descubrir clientes que no están en ninguna base — alguien tiene que llenar el mapa con negocios reales.",
+        definicion:"El motor de datos de terreno: scraping de locales, enriquecimiento con Google Places, deduplicación y onboarding de usuarios.",
+        como:"Edge Functions (prospectar-locales, scraping-masivo, enrich-negocios-google) + RPCs de limpieza (merge_duplicate_locals, detect_dark_kitchens).",
+        resultado:"Un catálogo de ~18.500 locales reales y sin duplicados, listos para asignar y visitar.",
+        ruido:null },
+      lider: { x:470, y:150, ic:"📊", label:"Líder", rol:"Jefe / Director comercial", estado:"vivo", madurez:1, drill:"lider",
+        necesidad:"El jefe comercial no ve dónde está su equipo ni qué zona quedó sin cubrir — dirige a ciegas o por WhatsApp.",
+        definicion:"El mundo del líder: pulso del equipo, reparto de cartera, alertas y metas en un solo panel.",
+        como:"RPCs get_ejecutivos_panel + get_alertas_equipo, sobre org_locales_estado y org_gestiones.",
+        resultado:"Ver en vivo quién produce, quién está parado y qué cliente está en riesgo — y actuar hoy, no a fin de mes.",
+        ruido:null },
+      miDia: { x:470, y:470, ic:"🧭", label:"Mi Día", rol:"Vendedor de terreno", estado:"vivo", madurez:1, drill:"miDia",
+        necesidad:"El vendedor arranca el día sin saber a quién visitar — arma su ruta a mano en Excel o llamando al jefe.",
+        definicion:"El mundo del vendedor: mapa con su ruta del día, check-in con GPS y registro de gestiones.",
+        como:"RPC get_mi_dia arma la ruta priorizada; el check-in es offline-first y escribe org_gestiones.",
+        resultado:"Abrís la app y sabés a quién visitar; en 3 taps registrás la visita. Cero Excel, cero llamada al jefe.",
+        ruido:null },
+      dueno: { x:900, y:120, ic:"👑", label:"Dueño / CEO", rol:"Fundador / Dueño", estado:"idea", madurez:1, drill:"dueno",
+        necesidad:"El dueño necesita leer el negocio completo — varios equipos, varias zonas — no solo el pulso de un equipo.",
+        definicion:"Visión global por encima del líder: salud del negocio, comparación entre equipos y zonas.",
+        como:"Todavía sin mecanismo propio — hoy se resuelve mirando el mismo panel de Líder.",
+        resultado:"(esperado) Leer el negocio de un vistazo para decidir dónde invertir y hacia dónde expandir.",
+        ruido:"Aún no se distingue del panel Líder — falta definir qué ve el Dueño que el Líder no." },
+      compartidos: { x:900, y:430, ic:"🔗", label:"Compartidos", rol:"Puentes entre mundos", estado:"obra", madurez:1, drill:"compartidos",
+        necesidad:"Varios roles usan las mismas cosas (el mapa, la ficha del cliente, la comunicación) — no deberían vivir duplicadas.",
+        definicion:"El tejido conectivo entre mundos: catálogo de locales, ficha del cliente y comunicación interna.",
+        como:"Tablas compartidas (locales, org_locales_estado, chat_mensajes) que cada rol consume a su manera.",
+        resultado:"Una sola fuente de verdad por cosa — que el líder y el vendedor miren exactamente el mismo cliente.",
+        ruido:null },
+    },
+    edges: [
+      { from:"plataforma", to:"miDia", lbl:"prospectos → mapa", crit:"vital",
+        nota:"Sin catálogo de locales, el mapa del vendedor está vacío. Es el combustible." },
+      { from:"lider", to:"miDia", lbl:"asigna cartera", crit:"vital",
+        nota:"Sin cartera asignada, get_mi_dia no tiene qué armar. Mi Día queda sin ruta." },
+      { from:"miDia", to:"lider", lbl:"gestiones → KPIs", crit:"vital",
+        nota:"Es la fuente de TODO el valor del líder: sin gestiones registradas, KPIs y alertas están vacíos." },
+      { from:"plataforma", to:"lider", lbl:"datos frescos", crit:"sec",
+        nota:"El panel del líder opera sobre la cartera ya asignada; el scraping fresco suma descubrimiento, no lo sostiene." },
+      { from:"compartidos", to:"lider", lbl:"comunicación", crit:"sec",
+        nota:"Chat interno líder↔vendedor — en construcción (spec aprobado ago-2026, 1-a-1 + Realtime). Aún no en producción." },
+      { from:"compartidos", to:"miDia", lbl:"comunicación", crit:"sec",
+        nota:"Mismo chat, lado del vendedor ('Con mi jefe'). En construcción." },
+      { from:"dueno", to:"lider", lbl:"supervisa", crit:"sec",
+        nota:"El Dueño hoy no aporta nada operativo que el Líder no tenga." },
+    ]
+  },
+
+  lider: {
+    titulo: "Líder", parent:"root",
+    nodes: {
+      pulso: { x:130, y:110, ic:"📈", label:"Pulso del equipo (KPIs)", rol:"Líder", estado:"obra", madurez:1, drill:null,
+        necesidad:"El líder no sabe quién de su equipo está produciendo hasta fin de mes — cuando ya es tarde para corregir.",
+        definicion:"Tablero de gestiones del mes, cierres y tasa de cierre por ejecutivo.",
+        como:"RPC get_ejecutivos_panel sobre org_gestiones, mostrado en la tabla de Pulso del equipo.",
+        resultado:"De un vistazo, quién produce y quién no — mientras todavía se puede hacer algo.",
+        ruido:"El sparkline de tendencia es un placeholder hardcodeado — hay foto de hoy, no película del mes." },
+      alertas: { x:490, y:110, ic:"🚨", label:"Alertas / Copiloto", rol:"Líder", estado:"vivo", madurez:1, drill:"alertas",
+        necesidad:"Los problemas (un cliente que se enfría, un vendedor parado) aparecen tarde y hay que buscarlos a mano.",
+        definicion:"El copiloto: detecta riesgo, vendedor parado y oportunidad sin asignar, y redacta la acción del día.",
+        como:"RPC get_alertas_equipo; hoy son reglas fijas (ej. 'sin contacto hace 21 días'). Nivel 1 de 3.",
+        resultado:"El sistema habla primero: dato + consecuencia + acción, sin que el líder tenga que ir a buscar.",
+        ruido:null },
+      asignacion: { x:850, y:110, ic:"🗂️", label:"Asignación de cartera", rol:"Líder", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El líder tiene que repartir el territorio entre vendedores sin planillas ni caos de coordinación.",
+        definicion:"Reasignación de locales entre ejecutivos, que cambia la ruta real del día del vendedor.",
+        como:"RPC get_org_locales_asignables (security definer — la que destrabamos esta semana).",
+        resultado:"El líder reparte terreno en segundos y el vendedor lo ve al instante en Mi Día.",
+        ruido:null },
+      gestion: { x:130, y:320, ic:"👥", label:"Gestionar equipo", rol:"Líder", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El líder necesita ajustar la zona, la meta y la función de cada vendedor sin depender de un admin.",
+        definicion:"El panel donde el líder edita zona, meta mensual y datos de cada ejecutivo.",
+        como:"EditarEjecutivoDrawer — persiste zona y meta por ejecutivo. (La lista de zonas es fija por ahora: equipoMock.)",
+        resultado:"El líder configura a su equipo solo, y los cambios se reflejan al instante en el Mi Día del vendedor.",
+        ruido:null },
+      invitar: { x:490, y:320, ic:"✉️", label:"Invitar ejecutivo", rol:"Líder", estado:"obra", madurez:1, drill:null,
+        necesidad:"Sumar a alguien al equipo no puede depender de que un técnico cree la cuenta a mano.",
+        definicion:"El líder invita por email; el vendedor recibe el mail, se registra y queda unido a la org.",
+        como:"Edge Function invite-user (service_role, deployada esta semana). El botón está cableado, el PR espera curls y merge.",
+        resultado:"El líder arma su equipo solo — clave para que un design partner arranque sin fricción.",
+        ruido:"En obra: backend deployado y auditado, pero el cableo del botón espera pruebas y merge." },
+      metas: { x:850, y:320, ic:"🎯", label:"Metas del equipo", rol:"Líder", estado:"obra", madurez:1, drill:null,
+        necesidad:"Sin un número que perseguir, el vendedor no sabe si va bien, y el líder no puede exigir con base.",
+        definicion:"Meta mensual de gestiones por ejecutivo, más meta de equipo con % de ritmo.",
+        como:"El líder la edita en EditarEjecutivoDrawer; se guarda por ejecutivo y alimenta el % de avance.",
+        resultado:"Cada vendedor tiene un norte medible y el líder ve el ritmo del equipo.",
+        ruido:"Solo mide cantidad de gestiones — falta meta de cierres, de facturación o por zona." },
+      zonas: { x:130, y:530, ic:"🏘️", label:"Cobertura de zonas", rol:"Líder", estado:"idea", madurez:1, drill:null,
+        necesidad:"El líder necesita ver qué zona quedó sin cubrir — el hueco por donde se escapan clientes.",
+        definicion:"Detección de zonas abandonadas: territorios con clientes pero sin ejecutivo asignado o sin visitar.",
+        como:"ZONA_ABANDONADA existe como tipo de alerta pero es un TODO — falta modelar zonas como entidad (hoy la zona es texto mock en el perfil).",
+        resultado:"(esperado) El líder ve el mapa de cobertura y redistribuye antes de perder terreno.",
+        ruido:"Frontera: es la 4ª alerta del copiloto, declarada pero sin implementar. Requiere una tabla de zonas real." },
+      comuna: { x:490, y:530, ic:"📨", label:"Comunicación interna", rol:"Compartido · Líder ↔ Vendedor", estado:"obra", madurez:1, drill:null,
+        necesidad:"El líder no tiene cómo darle una tarea o contexto al vendedor sin salir a su WhatsApp personal.",
+        definicion:"Chat interno líder ↔ vendedor — el otro lado del mismo nodo que vive en el mundo Mi Día.",
+        como:"Diseñado en territoria-simulador-v2 + tabla mensajes_equipo archivada (era Fudo). Hoy no vive en la app.",
+        resultado:"(esperado) Coordinar al equipo sin sacar la conversación fuera del producto.",
+        ruido:"Frontera CALIENTE: mockup + backend archivado. Reactivar es desenterrar y adaptar, no inventar de cero." },
+      comisiones: { x:850, y:530, ic:"💰", label:"Comisiones del equipo", rol:"Líder", estado:"idea", madurez:1, drill:null,
+        necesidad:"El líder necesita saber cuánto va a pagar en comisiones y usarlas como palanca de motivación.",
+        definicion:"El cálculo de comisiones por ejecutivo, derivado de cierres y metas.",
+        como:"No existe. Es la contraparte-líder del 'Mis metas / comisión' del vendedor. Requiere tablas de metas/comisiones.",
+        resultado:"(esperado) El líder proyecta el costo de comisiones y premia el desempeño con un número claro.",
+        ruido:"Frontera: mismo par metas/comisiones que falta del lado del vendedor. El gancho de motivación sin construir." },
+    },
+    edges: [
+      { from:"pulso", to:"alertas", lbl:"detecta", crit:"vital",
+        nota:"Las alertas se calculan de las gestiones del pulso. Sin ese dato, el copiloto no tiene qué decir." },
+      { from:"invitar", to:"gestion", lbl:"suma al equipo", crit:"vital",
+        nota:"Sin invitar, no hay ejecutivos que gestionar. Es la puerta de entrada al equipo." },
+      { from:"gestion", to:"pulso", lbl:"define zona y meta", crit:"vital",
+        nota:"El pulso muestra lo que gestión configuró (zona, meta por ejecutivo). Sin gestión, el pulso no tiene contra qué medir." },
+      { from:"asignacion", to:"alertas", lbl:"oportunidad → acción", crit:"sec",
+        nota:"La oportunidad sin asignar alimenta una alerta, pero el copiloto funciona sin esto." },
+      { from:"metas", to:"pulso", lbl:"contextualiza", crit:"sec",
+        nota:"La meta le da el % de avance al pulso; el pulso muestra los números igual sin meta." },
+      { from:"zonas", to:"alertas", lbl:"cobertura → alerta", crit:"sec",
+        nota:"Cable a frontera: la cobertura de zonas alimentaría la 4ª alerta (ZONA_ABANDONADA), aún sin implementar." },
+      { from:"comuna", to:"gestion", lbl:"comunica tarea", crit:"sec",
+        nota:"Cable a frontera: el líder podría empujar tareas al vendedor, pero el canal interno no existe." },
+      { from:"comisiones", to:"metas", lbl:"deriva de la meta", crit:"sec",
+        nota:"Cable a frontera: la comisión se calcularía de la meta y los cierres, pero no está construido." },
+    ]
+  },
+
+  miDia: {
+    titulo: "Mi Día", parent:"root",
+    nodes: {
+      ruta: { x:130, y:110, ic:"🛣️", label:"Ruta del día", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor no sabe por dónde empezar — tiene decenas de clientes y ninguna priorización.",
+        definicion:"La lista priorizada de a quién visitar hoy: vencidas primero, prospectos nuevos, y clientes 'de pasada'.",
+        como:"RPC get_mi_dia arma grupos (vencidas, nuevas, de-paso con st_dwithin 700m) y los ordena por prioridad. RutaTimeline los pinta.",
+        resultado:"El vendedor abre la app y tiene el día resuelto: a quién ver y con qué urgencia.",
+        ruido:null },
+      chatCli: { x:490, y:110, ic:"💬", label:"Chat con cliente", rol:"Compartido · Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita el hilo con cada negocio en un lugar, no perdido en su WhatsApp personal.",
+        definicion:"El hub de mensajería con el cliente: registra la conversación y hace deep-link a WhatsApp.",
+        como:"chat_mensajes (canal='whatsapp') + deep-link wa.me. Módulo Chat (PR #75/#76 de Diego).",
+        resultado:"Cada negocio tiene su hilo ordenado — el vendedor retoma la conversación sin buscar.",
+        ruido:null },
+      progreso: { x:850, y:110, ic:"🔥", label:"Progreso del día", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita saber si va bien sin abrir un Excel ni preguntarle al jefe.",
+        definicion:"El anillo y los stats honestos del día: gestiones que lleva, racha, avance del día.",
+        como:"MisionHeader + useMisionProgreso sobre get_mi_dia_stats.",
+        resultado:"De un vistazo ve su avance del día — motivación propia, sin control externo.",
+        ruido:null },
+      perfil: { x:1180, y:110, ic:"👤", label:"Mi perfil", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita ver y editar sus datos de contacto, y cerrar sesión.",
+        definicion:"La pantalla de perfil: nombre, teléfono y email del vendedor.",
+        como:"PerfilPage sobre la tabla profiles. (El bug de 'guardar datos' se arregló esta semana.)",
+        resultado:"Sus datos al día — base para que el líder lo identifique y lo contacte.",
+        ruido:null },
+      mapa: { x:130, y:320, ic:"🗺️", label:"Mapa de locales", rol:"Compartido · Vendedor/Líder", estado:"vivo", madurez:1, drill:"mapaLocales",
+        necesidad:"El vendedor necesita ver dónde están sus clientes y prospectos, no una lista plana.",
+        definicion:"El mapa (/ruta) con los locales geolocalizados, filtrados por rubro y estado.",
+        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local.",
+        resultado:"El vendedor ve su territorio de un vistazo y decide a quién visitar en contexto geográfico.",
+        ruido:null },
+      checkin: { x:490, y:320, ic:"📍", label:"Check-in / Registrar gestión", rol:"Vendedor", estado:"vivo", madurez:1, drill:"checkin",
+        necesidad:"Registrar una visita tiene que ser instantáneo — si tarda, el vendedor no lo hace y el dato se pierde.",
+        definicion:"El registro de la visita: GPS y hora automáticos, resultado en 4 chips, nota y foto opcionales. Funciona offline.",
+        como:"RegistrarGestionSheet → cola en IndexedDB → sync a org_gestiones. Fuera de rango >200m no bloquea, solo etiqueta.",
+        resultado:"En 3 taps la visita queda registrada, aunque no haya señal. Es LA arteria: de acá sale todo el valor del líder.",
+        ruido:null },
+      pendientes: { x:850, y:320, ic:"📌", label:"Pendientes", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor deja compromisos ('paso el jueves') que se olvidan si no quedan agendados en algún lado.",
+        definicion:"Los compromisos agendados, en cuatro cortes: vencidas, hoy, mañana, próximas.",
+        como:"org_locales_estado.proximo_contacto_at — lo escribe el check-in, lo lee usePendientes. Reconstruido esta semana sobre datos reales.",
+        resultado:"Nada se cae entre las grietas: lo que prometiste queda agendado y te espera.",
+        ruido:null },
+      metas: { x:130, y:530, ic:"🎯", label:"Mis metas / comisión", rol:"Vendedor", estado:"idea", madurez:1, drill:null,
+        necesidad:"El vendedor quiere ver su meta y su comisión — cuánto le falta y cuánto va a ganar.",
+        definicion:"El anillo plateado del mockup: meta del mes y comisión proyectada, del lado del vendedor.",
+        como:"Excluido a propósito en Fase 1B (DashboardPage lo documenta). La ruta /metas está reservada pero sin construir.",
+        resultado:"(esperado) El vendedor persigue un número claro y ve su comisión en tiempo real — el mayor gancho de adopción.",
+        ruido:"Frontera planificada: diseñada (anillo plateado) y con ruta reservada, pero fuera de Fase 1. Requiere tablas de metas/comisiones." },
+      optim: { x:490, y:530, ic:"🚗", label:"Optimización de ruta", rol:"Vendedor", estado:"idea", madurez:1, drill:null,
+        necesidad:"La ruta dice a quién visitar, pero no en qué orden caminarla — el vendedor pierde tiempo yendo y viniendo.",
+        definicion:"El orden óptimo del recorrido: minimizar distancia y tiempo entre paradas (tipo problema del viajante).",
+        como:"No existe. get_mi_dia prioriza por urgencia y tipo, no por eficiencia geográfica del trayecto.",
+        resultado:"(esperado) Más visitas por día caminando menos kilómetros.",
+        ruido:"Frontera real: hoy la ruta se prioriza pero no se optimiza el recorrido. Es un hueco, no un bug." },
+      comInt: { x:850, y:530, ic:"📨", label:"Comunicación interna", rol:"Compartido · Vendedor ↔ Líder", estado:"obra", madurez:1, drill:null,
+        necesidad:"El vendedor necesita recibir tareas y contexto del líder sin salir a su WhatsApp personal.",
+        definicion:"El chat interno con el líder — el otro lado del mismo nodo que vive en el mundo Líder.",
+        como:"org_mensajes_equipo (multi-tenant + RLS + Realtime) en producción. Hook useChatEquipo + montaje en Mi Día y panel Líder. 2 PRs verificados, sin mergear.",
+        resultado:"El vendedor recibe indicaciones del líder dentro del producto, en vivo — no en un chat aparte.",
+        ruido:"En obra: backend en prod (ago-2026), frontend en PR sin mergear. El otro lado del mismo nodo vive en el mundo Líder." },
+      recordatorios: { x:1180, y:320, ic:"⏰", label:"Recordatorios automáticos", rol:"Vendedor", estado:"idea", madurez:1, drill:null,
+        necesidad:"El vendedor necesita que le recuerden el follow-up (ej. a los 5 días) sin depender de su memoria.",
+        definicion:"Recordatorios de seguimiento automáticos, pensados para avisar por WhatsApp.",
+        como:"RecordatoriosInteligentes.tsx + Edge Function whatsapp-reminders. PERO el componente no lo monta ninguna pantalla y la función lee de 'actividades', tabla que no existe.",
+        resultado:"(esperado) El vendedor recibe recordatorios de seguimiento sin agendarlos a mano.",
+        ruido:"Roto: componente huérfano + Edge Function contra la tabla fantasma 'actividades'. Hoy no funciona. Reconstruir sobre proximo_contacto_at o borrar." },
+    },
+    edges: [
+      { from:"ruta", to:"checkin", lbl:"lleva a la visita", crit:"vital",
+        nota:"Sin la ruta priorizada, el vendedor no sabe a quién hacerle check-in. La ruta abre la visita." },
+      { from:"checkin", to:"progreso", lbl:"suma al avance", crit:"vital",
+        nota:"Cada check-in mueve el anillo y la racha. Sin check-in, el progreso queda en cero para siempre." },
+      { from:"checkin", to:"pendientes", lbl:"reagenda próximo", crit:"vital",
+        nota:"El check-in setea el próximo contacto — así nace un pendiente. Sin check-in, la agenda no se llena sola." },
+      { from:"mapa", to:"ruta", lbl:"de dónde salen los locales", crit:"vital",
+        nota:"La ruta prioriza los locales que viven en el mapa. Sin catálogo geolocalizado, no hay a quién priorizar." },
+      { from:"chatCli", to:"checkin", lbl:"otro canal de contacto", crit:"sec",
+        nota:"El chat es una vía de contacto paralela a la visita; complementa el check-in, no lo condiciona." },
+      { from:"perfil", to:"progreso", lbl:"identidad del vendedor", crit:"sec",
+        nota:"El perfil da nombre y datos al ejecutivo cuyos números muestra el progreso. Soporte, no flujo." },
+      { from:"metas", to:"progreso", lbl:"daría el número a perseguir", crit:"sec",
+        nota:"Cable a frontera: la meta/comisión del vendedor le daría sentido al progreso, pero aún no existe." },
+      { from:"optim", to:"ruta", lbl:"ordenaría el recorrido", crit:"sec",
+        nota:"Cable a un nodo frontera: la optimización de recorrido no existe aún." },
+      { from:"comInt", to:"checkin", lbl:"tareas del líder", crit:"sec",
+        nota:"El líder empuja tareas y contexto al día del vendedor por el chat interno (en obra: backend en prod)." },
+      { from:"pendientes", to:"recordatorios", lbl:"automatizaría el follow-up", crit:"sec",
+        nota:"Cable a un nodo roto: los recordatorios apuntan a una tabla fantasma; hoy el follow-up depende de Pendientes, a mano." },
+    ]
+  },
+
+  checkin: {
+    titulo: "Check-in", parent:"miDia",
+    nodes: {
+      resultado: { x:100, y:260, ic:"☑️", label:"Resultado (4 chips)", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor tiene que decir qué pasó en la visita en un solo toque — cualquier fricción y no lo registra.",
+        definicion:"Los 4 resultados: Pedido/Cierre 🤝, Interesado 👍, No estaba 🚪, No interesado 👎. Único toque obligatorio del check-in.",
+        como:"QuePaso en RegistrarGestionSheet. calcularEstadoPost mapea el chip al nuevo estado del local (pedido → cliente).",
+        resultado:"En un tap queda registrado qué pasó, y el estado del cliente se actualiza solo.",
+        ruido:null },
+      proximo: { x:470, y:110, ic:"📅", label:"Próximo contacto", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Si no se agenda la próxima visita en el momento, se olvida — y el cliente se enfría.",
+        definicion:"Cuándo volver a este cliente. Se calcula del resultado, o el vendedor lo fija a mano.",
+        como:"proximoContactoDesde(quePaso) calcula la fecha; override manual opcional. Escribe proximo_contacto_at.",
+        resultado:"Cada visita deja la próxima agendada — así se llena Pendientes y así el copiloto detecta riesgo.",
+        ruido:null },
+      offline: { x:850, y:260, ic:"💾", label:"Guardado offline", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor está en terreno, muchas veces sin señal. Si el registro depende de la red, se pierde.",
+        definicion:"El check-in nunca espera a la red: encola local y sincroniza en segundo plano.",
+        como:"addToPendingSync → cola en IndexedDB (offlineDB.ts) → syncEngine reintenta al reconectar; idempotency key contra duplicados.",
+        resultado:"El vendedor registra al instante, con o sin señal. El dato nunca se pierde.",
+        ruido:null },
+      gps: { x:330, y:440, ic:"🛰️", label:"GPS / Geolocalización", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El jefe quiere saber que la visita fue real y presencial, sin que el vendedor haga nada extra.",
+        definicion:"Ubicación y hora automáticas. Fuera de rango >200m no bloquea — solo etiqueta la gestión.",
+        como:"gpsService.getFreshPosition. Si el navegador niega el permiso, la gestión igual se guarda (GPS opcional).",
+        resultado:"Prueba de presencia sin fricción — y sin castigar al vendedor si el GPS falla o está lejos.",
+        ruido:null },
+      nota: { x:560, y:450, ic:"📝", label:"Nota", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita dejar contexto ('pidió hablar con el dueño el jueves') para no olvidarlo.",
+        definicion:"Texto libre opcional sobre la visita.",
+        como:"Campo nota → datos_extra.nota en org_gestiones. Se muestra en el historial del local (arreglado esta semana).",
+        resultado:"El contexto de cada visita queda guardado y visible la próxima vez.",
+        ruido:null },
+      foto: { x:790, y:450, ic:"📷", label:"Foto", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"A veces una imagen (la vidriera, el pedido, la fachada) dice más que una nota.",
+        definicion:"Adjuntar una foto opcional a la gestión.",
+        como:"Campo foto (File) → se encola junto a la gestión en la cola offline.",
+        resultado:"Evidencia visual de la visita, pegada al registro.",
+        ruido:null },
+      cotizador: { x:1090, y:150, ic:"🧾", label:"Cotizador", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Cuando el cliente se interesa en la visita, el vendedor necesita armar y mostrar una cotización al momento — no volver a la oficina.",
+        definicion:"El armador de cotizaciones: elige plan/productos, calcula el total y exporta un PDF para dejarle al cliente.",
+        como:"CotizacionSheet (desde RegistrarGestionSheet) + useCotizaciones → tabla cotizaciones. Genera el PDF en el teléfono.",
+        resultado:"El vendedor deja una propuesta formal en la visita misma — acorta el camino al cierre.",
+        ruido:null },
+      pagoInt: { x:1090, y:340, ic:"💳", label:"Pago integrado", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Cuando un local cierra, hay que poder activar el pago integrado ahí mismo, no como un trámite aparte que se enfría.",
+        definicion:"El paso de activación de pago cuando el local pasa a cliente: estado y activación dentro del propio flujo de gestión.",
+        como:"PagoIntegradoGestionStep en RegistrarGestionSheet + lib/pagoIntegrado.ts. Campos pago_integrado_estado / pago_integrado_activo en el local.",
+        resultado:"El cierre y la activación de pago ocurren en un mismo momento — menos fricción para monetizar la relación.",
+        ruido:null },
+    },
+    edges: [
+      { from:"resultado", to:"cotizador", lbl:"si es cierre, cotiza", crit:"sec",
+        nota:"Cuando el resultado es Pedido/Cierre, el vendedor puede armar la cotización en la visita misma." },
+      { from:"cotizador", to:"pagoInt", lbl:"cierre → activar pago", crit:"sec",
+        nota:"Con el cierre y la propuesta hecha, sigue la activación de pago integrado en el mismo flujo." },
+      { from:"resultado", to:"offline", lbl:"encola la gestión", crit:"vital",
+        nota:"El resultado es el corazón de la gestión: se encola sí o sí. Sin él no hay check-in." },
+      { from:"resultado", to:"proximo", lbl:"calcula la próxima", crit:"vital",
+        nota:"El resultado determina cuándo volver (un 'interesado' se re-agenda distinto que un 'no estaba')." },
+      { from:"gps", to:"offline", lbl:"adjunta ubicación", crit:"sec",
+        nota:"Opcional: si el GPS está disponible se adjunta; si no, la gestión se guarda igual." },
+      { from:"nota", to:"offline", lbl:"adjunta contexto", crit:"sec",
+        nota:"Opcional: enriquece la gestión, no la condiciona." },
+      { from:"foto", to:"offline", lbl:"adjunta imagen", crit:"sec",
+        nota:"Opcional: evidencia visual, no obligatoria." },
+    ]
+  },
+
+  plataforma: {
+    titulo: "Plataforma / Admin", parent:"root",
+    nodes: {
+      descubrimiento: { x:130, y:110, ic:"🔍", label:"Descubrimiento (scraping)", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:"descubrimiento",
+        necesidad:"El catálogo tiene que llenarse con negocios reales — no se puede vender un mapa vacío.",
+        definicion:"Scraping de locales desde plataformas de delivery y fuentes web.",
+        como:"Edge Functions prospectar-locales + scraping-masivo. Scrapers de Rappi, UberEats, PedidosYa, Justo.",
+        resultado:"Miles de negocios reales entran al catálogo, geolocalizados, listos para el mapa.",
+        ruido:null },
+      enriquecimiento: { x:490, y:110, ic:"✨", label:"Enriquecimiento", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Un local scrapeado viene incompleto — sin teléfono, sin rubro claro, a veces sin dirección exacta.",
+        definicion:"Completar cada local con datos de Google Places: teléfono, rating, categoría, coordenadas.",
+        como:"Edge Function enrich-negocios-google (Fase 2). rubro_y_subcategoria_from_google_types clasifica de paso.",
+        resultado:"Cada local pasa de 'nombre + zona' a una ficha completa y contactable.",
+        ruido:null },
+      dedup: { x:850, y:110, ic:"🧹", label:"Deduplicación y limpieza", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:"dedup",
+        necesidad:"El mismo negocio aparece varias veces (distintas plataformas, variantes de nombre) — el dato sucio rompe la confianza.",
+        definicion:"Detecta y fusiona duplicados, y marca dark kitchens (cocinas fantasma que no son locales reales).",
+        como:"find_match_exact/similar + merge_duplicate_locals + detect_dark_kitchens. RUT y dirección como señales fuertes.",
+        resultado:"Un catálogo sin duplicados — cada negocio aparece una sola vez, confiable.",
+        ruido:null },
+      importacion: { x:130, y:320, ic:"📥", label:"Importación", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"A veces los datos vienen de un archivo (patentes municipales, un CSV del cliente), no del scraping.",
+        definicion:"Importar locales desde archivos estructurados, pasándolos por el mismo pipeline de limpieza.",
+        como:"Edge Functions process-import + process-import-v2. Ej: import de patentes de La Reina (PR #72 de Diego).",
+        resultado:"Fuentes externas entran al catálogo con la misma calidad que el scraping.",
+        ruido:null },
+      clasificacion: { x:490, y:320, ic:"🏷️", label:"Clasificación de rubros", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Sin rubro, el vendedor no puede filtrar el mapa por tipo de negocio — y el acceso al local depende del rubro.",
+        definicion:"Asignar rubro y subcategoría a cada local, y recomputar los niveles de la jerarquía.",
+        como:"rubro_y_subcategoria_from_names / from_google_types + recompute_niveles_bulk.",
+        resultado:"Cada local queda clasificado — el vendedor filtra por rubro y el sistema controla el acceso.",
+        ruido:null },
+      onboarding: { x:850, y:320, ic:"✉️", label:"Onboarding de usuarios", rol:"Admin / Líder", estado:"obra", madurez:1, drill:null,
+        necesidad:"Sumar personas (líderes, vendedores) a una organización no puede ser un proceso manual de base de datos.",
+        definicion:"Invitación por email y gestión de cuentas de usuario.",
+        como:"Edge Functions invite-user (deployada esta semana) + admin-update-user.",
+        resultado:"Un líder invita a su equipo solo; el admin gestiona cuentas sin tocar SQL.",
+        ruido:"invite-user en obra: deployado y auditado, pero el cableo del botón espera pruebas y merge." },
+      filtroCad: { x:310, y:530, ic:"⛔", label:"Filtro anti-cadenas", rol:"Admin · Diego", estado:"idea", madurez:1, drill:null,
+        necesidad:"El scraping trae cadenas grandes (McDonald's, Starbucks) que no son el ICP — hay que filtrarlas.",
+        definicion:"Excluir cadenas del pipeline de datos para que el vendedor solo vea negocios SMB.",
+        como:"chainFilter.ts + match-cadena-reportada consultan la tabla cadenas_excluidas — que NO existe en producción.",
+        resultado:"(esperado) El catálogo se queda con SMBs, sin las grandes cadenas.",
+        ruido:"ROTO: chainFilter apunta a cadenas_excluidas, tabla fantasma. El filtro no filtra nada. Hallazgo del barrido de features fantasma — revisar con Diego." },
+      backoffice: { x:1160, y:110, ic:"🖥️", label:"Backoffice / Consola", rol:"Admin plataforma", estado:"vivo", madurez:1, drill:"admin",
+        necesidad:"El motor de datos y el multi-tenant necesitan una consola para operarse — no todo se maneja desde Edge Functions.",
+        definicion:"El panel de administración: dashboard, organizaciones, catálogo, y las consolas que disparan el pipeline.",
+        como:"AdminPage con 9 pestañas montadas. Abrí este nodo para ver cuáles están vivas y cuáles hay que limpiar.",
+        resultado:"Diego opera toda la plataforma desde botones — y el mapa muestra qué del backoffice sirve y qué es basura.",
+        ruido:null },
+      inbound: { x:670, y:530, ic:"🆕", label:"Inbound (empresas nuevas)", rol:"Admin · Diego", estado:"idea", madurez:1, drill:null,
+        necesidad:"Los negocios que recién abren son el mejor prospecto — nadie los tiene todavía. Hay que detectarlos apenas nacen.",
+        definicion:"Captar empresas nuevas de Chile (constitución reciente) como flujo de prospectos primicia.",
+        como:"RES/SII bloqueado (reCAPTCHA infranqueable). Única vía: API comercial (Floid/BaseAPI) — ~20k empresas/mes. Sin construir.",
+        resultado:"(esperado) El vendedor llega primero, cuando el negocio recién abre y no tiene proveedor.",
+        ruido:"Frontera estratégica: la fuente pública está bloqueada; requiere contratar una API comercial. Es el bucle B1 (primicia territorial)." },
+    },
+    edges: [
+      { from:"descubrimiento", to:"enriquecimiento", lbl:"local crudo → completo", crit:"vital",
+        nota:"Lo scrapeado viene incompleto; el enriquecimiento lo vuelve contactable. Paso obligado del pipeline." },
+      { from:"enriquecimiento", to:"dedup", lbl:"completo → limpio", crit:"vital",
+        nota:"Antes de entrar al catálogo, cada local pasa por deduplicación. Sin esto, el dato sucio llega al vendedor." },
+      { from:"importacion", to:"dedup", lbl:"archivo → limpio", crit:"vital",
+        nota:"Los importados pasan por el mismo filtro de limpieza que el scraping — misma vara de calidad." },
+      { from:"dedup", to:"clasificacion", lbl:"limpio → clasificado", crit:"vital",
+        nota:"El catálogo limpio se clasifica por rubro. De acá sale el dato que ve el vendedor en el mapa." },
+      { from:"inbound", to:"descubrimiento", lbl:"otra fuente de prospectos", crit:"sec",
+        nota:"Cable a frontera: las empresas nuevas serían otra vía de descubrimiento, aún sin construir." },
+      { from:"filtroCad", to:"dedup", lbl:"debería filtrar cadenas", crit:"sec",
+        nota:"Cable a un nodo roto: el filtro anti-cadenas apunta a una tabla fantasma, hoy no filtra nada." },
+      { from:"backoffice", to:"descubrimiento", lbl:"consola que lo opera", crit:"sec",
+        nota:"El backoffice es la cara visible que dispara y monitorea el pipeline; el motor corre igual sin la UI." },
+    ]
+  },
+
+  admin: {
+    titulo: "Backoffice / Admin", parent:"plataforma",
+    nodes: {
+      dashboard: { x:130, y:110, ic:"📊", label:"Dashboard / Métricas", rol:"Admin plataforma", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El admin necesita ver la salud de la operación: cuántos locales, cuántas orgs, uso de API, cuota.",
+        definicion:"El panel de control de la operación: métricas del catálogo, uso de API y actividad.",
+        como:"AdminDashboardTab + AdminMetricsPanel + get_api_usage_summary.",
+        resultado:"El admin ve el estado del sistema de un vistazo y detecta problemas de operación.",
+        ruido:null },
+      orgs: { x:490, y:110, ic:"🏢", label:"Organizaciones (multi-tenant)", rol:"Admin plataforma", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Cada cliente de Territoria es una organización aislada — hay que crearlas y administrarlas.",
+        definicion:"Gestión de las organizaciones-cliente: crear, configurar y ver el detalle de cada tenant.",
+        como:"AdminOrganizationsTab + AdminOrganizationDetailPage sobre organizations + organization_users.",
+        resultado:"El admin da de alta y administra cada cliente — la base del modelo SaaS multi-tenant. Lo más estratégico de esta consola.",
+        ruido:null },
+      catalogo: { x:850, y:110, ic:"🗃️", label:"Gestión del catálogo", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El catálogo de ~18.500 locales necesita curaduría: editar, corregir y revisar negocios.",
+        definicion:"La consola para ver, editar y curar los locales del catálogo maestro.",
+        como:"AdminNegociosTab sobre locales, con filtros y edición.",
+        resultado:"El admin mantiene la calidad del catálogo que después ve todo vendedor.",
+        ruido:null },
+      consolas: { x:310, y:340, ic:"🎛️", label:"Consolas del pipeline", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El motor de datos (scraping, dedup, imports) necesita botones para dispararse, no solo Edge Functions.",
+        definicion:"Las pestañas que operan el pipeline de Plataforma: scraping, imports, enriquecer, niveles, duplicados.",
+        como:"AdminScrapingTab, AdminImportsTab, AdminEnriquecerTab, AdminNivelesTab, AdminDuplicatesTab — las UIs del motor.",
+        resultado:"Diego opera el pipeline desde la interfaz. Son la cara visible del mundo Plataforma.",
+        ruido:null },
+      brandvoice: { x:670, y:340, ic:"🗣️", label:"Brand Voice", rol:"Admin", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Los mensajes automáticos (recordatorios, plantillas) deben sonar consistentes con la marca.",
+        definicion:"Configuración del tono y la voz de los mensajes del sistema.",
+        como:"AdminBrandVoiceTab.",
+        resultado:"Los mensajes que salen del producto suenan coherentes, no genéricos.",
+        ruido:null },
+      muertas: { x:490, y:560, ic:"🗑️", label:"Pestañas muertas (limpiar)", rol:"Admin · deuda técnica", estado:"idea", madurez:1, drill:null,
+        necesidad:"El backoffice arrastra pestañas que ya no se montan y apuntan a tablas fantasma — ruido y riesgo.",
+        definicion:"3 pestañas huérfanas del barrido: Usuarios/roles, Cadenas, Direcciones inválidas.",
+        como:"AdminUsersTab (user_roles), AdminCadenasTab (cadenas_excluidas), DireccionesInvalidasTab — no montadas en AdminPage, apuntan a tablas inexistentes.",
+        resultado:"(a hacer) Borrarlas. Cero riesgo, menos ruido, y elimina la falsa sensación de features que no funcionan.",
+        ruido:"DEUDA para desarrollo: 3 pestañas muertas. La de Usuarios/roles da la ilusión de dar/quitar admin sin hacerlo — la más peligrosa. Borrar." },
+    },
+    edges: [
+      { from:"consolas", to:"catalogo", lbl:"alimentan el catálogo", crit:"vital",
+        nota:"Scraping, imports y enriquecer llenan el catálogo de negocios. Sin las consolas, el catálogo no crece." },
+      { from:"catalogo", to:"dashboard", lbl:"nutre las métricas", crit:"sec",
+        nota:"El estado del catálogo alimenta el dashboard de operación." },
+      { from:"orgs", to:"dashboard", lbl:"clientes activos", crit:"sec",
+        nota:"El conteo de organizaciones-cliente es una métrica central del dashboard." },
+      { from:"brandvoice", to:"orgs", lbl:"tono por cliente", crit:"sec",
+        nota:"El tono de los mensajes podría configurarse por organización." },
+    ]
+  },
+
+  dueno: {
+    titulo: "Dueño / CEO", parent:"root",
+    nodes: {
+      salud: { x:150, y:150, ic:"🩺", label:"Salud del negocio", rol:"Dueño", estado:"idea", madurez:1, drill:null,
+        necesidad:"El dueño necesita leer la salud de todo el negocio de un vistazo, no equipo por equipo.",
+        definicion:"Dashboard global: clientes activos, ingresos, retención, uso — el pulso de la empresa, no de un equipo.",
+        como:"No existe como vista propia. Hoy el dueño mira el mismo panel de Líder de una organización.",
+        resultado:"(esperado) El dueño decide con datos del negocio completo, no de un solo equipo.",
+        ruido:"Frontera: el mundo del Dueño casi no existe — hoy se confunde con el del Líder." },
+      multiequipo: { x:620, y:150, ic:"🏢", label:"Multi-equipo / multi-zona", rol:"Dueño", estado:"idea", madurez:1, drill:null,
+        necesidad:"Con varios equipos o sucursales, el dueño necesita compararlos — quién rinde y quién no.",
+        definicion:"Vista comparativa entre equipos, líderes y zonas de la misma empresa.",
+        como:"No existe. El schema es multi-tenant por org, pero no hay concepto de múltiples equipos dentro de una org.",
+        resultado:"(esperado) El dueño ve qué equipo o zona rinde mejor y redistribuye recursos.",
+        ruido:"Frontera: requiere modelar 'equipos' como entidad — dependencia declarada en la visión de producto." },
+      adopcion: { x:150, y:400, ic:"📈", label:"Adopción del producto", rol:"Dueño / Admin", estado:"obra", madurez:1, drill:null,
+        necesidad:"El dueño (y nosotros) necesita saber si el producto se usa de verdad — o si lo abren y lo abandonan.",
+        definicion:"Métricas de uso: quién entra, con qué frecuencia, qué features toca.",
+        como:"get_api_usage_summary existe del lado admin (uso de API). Falta analítica de adopción por org y usuario.",
+        resultado:"(esperado) Saber si un design partner realmente adoptó — la métrica que define el PMF.",
+        ruido:"Parcial: hay uso de API (admin), falta la analítica de adopción como producto." },
+      expansion: { x:620, y:400, ic:"🌎", label:"Expansión", rol:"Dueño", estado:"idea", madurez:1, drill:null,
+        necesidad:"El dueño necesita saber dónde crecer — qué comuna, qué rubro, cuándo saltar de mercado.",
+        definicion:"Inteligencia de expansión: dónde hay demanda no cubierta, cuándo dar el salto a LATAM.",
+        como:"No existe. Regla vigente: no expandir a LATAM antes de PMF en Chile.",
+        resultado:"(esperado) Decidir la próxima zona o país con datos, no con intuición.",
+        ruido:"Frontera lejana: bloqueada a propósito hasta el PMF en Chile. Es visión, no roadmap cercano." },
+    },
+    edges: [
+      { from:"adopcion", to:"salud", lbl:"uso → salud", crit:"sec",
+        nota:"La adopción real es un componente de la salud del negocio; hoy solo hay uso de API del lado admin." },
+      { from:"multiequipo", to:"salud", lbl:"equipos → visión global", crit:"sec",
+        nota:"Cable a frontera: comparar equipos alimentaría la salud global, pero el concepto de equipos no existe." },
+      { from:"salud", to:"expansion", lbl:"salud → dónde crecer", crit:"sec",
+        nota:"Cable a frontera: la salud del negocio orientaría la expansión, aún sin construir." },
+    ]
+  },
+
+  compartidos: {
+    titulo: "Compartidos", parent:"root",
+    nodes: {
+      catalogo: { x:150, y:150, ic:"🗄️", label:"Catálogo de locales", rol:"Compartido · todos", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Todos los roles miran los mismos negocios — no puede haber una versión distinta por rol.",
+        definicion:"La tabla maestra de locales: ~18.500 negocios geolocalizados, la fuente de verdad.",
+        como:"Tabla locales (poblada por Plataforma). La RLS por rubro controla qué ve cada organización.",
+        resultado:"Una sola fuente de negocios — el líder y el vendedor miran exactamente el mismo local.",
+        ruido:null },
+      ficha: { x:620, y:150, ic:"📄", label:"Ficha del cliente", rol:"Compartido · Vendedor/Líder", estado:"vivo", madurez:1, drill:"ficha",
+        necesidad:"Al abrir un negocio hay que ver todo lo suyo en un lugar: historial, contactos, notas, estado.",
+        definicion:"La vista de detalle de un local: gestiones pasadas, contactos, notas, próximo contacto.",
+        como:"LocalDetailPage/Sheet sobre org_locales_estado + org_gestiones + local_contactos. (Notas del check-in visibles desde esta semana.)",
+        resultado:"Cualquier rol abre un cliente y entiende su historia completa al instante.",
+        ruido:null },
+      chatCli: { x:150, y:400, ic:"💬", label:"Chat con cliente", rol:"Compartido · Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita el hilo con cada negocio en un lugar, no perdido en su WhatsApp personal.",
+        definicion:"El hub de mensajería con el cliente: registra la conversación y hace deep-link a WhatsApp.",
+        como:"chat_mensajes (canal='whatsapp') + deep-link wa.me. Módulo Chat (PR #75/#76 de Diego).",
+        resultado:"Cada negocio tiene su hilo ordenado — se retoma la conversación sin buscar.",
+        ruido:null },
+      comInt: { x:620, y:400, ic:"📨", label:"Comunicación interna", rol:"Compartido · Líder ↔ Vendedor", estado:"obra", madurez:1, drill:null,
+        necesidad:"El equipo necesita coordinarse (tareas, contexto) sin salir a WhatsApp personal.",
+        definicion:"Chat interno líder ↔ vendedor — el nodo que aparece en los mundos Mi Día y Líder.",
+        como:"Diseñado en territoria-simulador-v2 + tabla mensajes_equipo archivada (era Fudo). Hoy no vive en la app.",
+        resultado:"(esperado) Coordinar al equipo dentro del producto, no en un chat aparte.",
+        ruido:"Frontera caliente: mockup + backend archivado. El mismo nodo compartido que ya viste en Mi Día y Líder." },
+    },
+    edges: [
+      { from:"catalogo", to:"ficha", lbl:"detalle de un local", crit:"vital",
+        nota:"La ficha es la vista de detalle de un local del catálogo. Sin catálogo, no hay ficha que abrir." },
+      { from:"ficha", to:"chatCli", lbl:"contactar al cliente", crit:"sec",
+        nota:"Desde la ficha se salta a chatear con el negocio; es un canal, no una dependencia dura." },
+    ]
+  },
+
+  alertas: {
+    titulo: "Alertas / Copiloto", parent:"lider",
+    nodes: {
+      riesgo: { x:130, y:110, ic:"⚠️", label:"Cliente en riesgo", rol:"Líder", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Un cliente que deja de recibir visitas se enfría y se pierde, sin que nadie lo note a tiempo.",
+        definicion:"Alerta cuando un cliente lleva demasiados días sin contacto.",
+        como:"get_alertas_equipo, regla fija: 'sin contacto hace 21+ días' sobre ultimo_contacto_at.",
+        resultado:"El líder ve qué clientes están por enfriarse y manda a visitarlos antes de perderlos.",
+        ruido:null },
+      parado: { x:490, y:110, ic:"😴", label:"Vendedor parado", rol:"Líder", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Un vendedor que no registra visitas por días puede estar trabado — el líder debe enterarse rápido.",
+        definicion:"Alerta cuando un ejecutivo lleva días hábiles sin ninguna gestión.",
+        como:"get_alertas_equipo, regla fija: '>2 días hábiles sin gestión' sobre MAX(org_gestiones.fecha).",
+        resultado:"El líder detecta al vendedor trabado y lo destraba — ayuda, no castigo.",
+        ruido:null },
+      oportunidad: { x:850, y:110, ic:"💡", label:"Oportunidad sin asignar", rol:"Líder", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Un prospecto nuevo sin ejecutivo asignado es una venta que nadie está trabajando.",
+        definicion:"Alerta cuando hay prospectos en la cartera de la org sin vendedor asignado.",
+        como:"get_alertas_equipo, regla: prospectos con asignado_a nulo.",
+        resultado:"El líder asigna el prospecto antes de que se enfríe — cero leads olvidados.",
+        ruido:null },
+      zona: { x:130, y:340, ic:"🏘️", label:"Zona abandonada", rol:"Líder", estado:"idea", madurez:1, drill:null,
+        necesidad:"Territorios enteros pueden quedar sin cubrir, y el líder no lo ve hasta que pierde clientes ahí.",
+        definicion:"La 4ª alerta: zonas con clientes pero sin ejecutivo asignado o sin visitar.",
+        como:"ZONA_ABANDONADA declarada como tipo, pero es un TODO — falta modelar zonas como entidad real.",
+        resultado:"(esperado) El líder ve el hueco de cobertura y redistribuye antes de perder terreno.",
+        ruido:"Frontera: el 4º tipo de alerta, declarado pero sin implementar. Requiere una tabla de zonas." },
+      patrones: { x:490, y:340, ic:"📊", label:"Nivel 2 — Patrones", rol:"Líder · evolución", estado:"idea", madurez:2, drill:null,
+        necesidad:"Las reglas fijas ('21 días') no calzan con todos — algunos clientes se visitan semanal, otros mensual.",
+        definicion:"El copiloto aprende el ritmo real de cada cliente y ejecutivo, y afina las alertas a la medida.",
+        como:"No existe. Es el salto de umbrales fijos a umbrales aprendidos por historial. Nivel 2 de los 3 de inteligencia.",
+        resultado:"(esperado) Alertas que se adaptan: 'este cliente se visita cada 10 días y ya van 14'.",
+        ruido:"Frontera: el nivel 2 del copiloto. Hoy los 3 tipos de arriba están en nivel 1 (reglas fijas)." },
+      ia: { x:850, y:340, ic:"🤖", label:"Nivel 3 — IA predictiva", rol:"Líder · evolución", estado:"idea", madurez:3, drill:null,
+        necesidad:"El líder no solo quiere saber qué pasó — quiere saber qué va a pasar y qué hacer al respecto.",
+        definicion:"El copiloto predice (este cliente va a cerrar / a irse), prioriza y redacta la acción con IA.",
+        como:"No existe. Nivel 3: modelos predictivos + generación. Es el norte de diferenciación, post-PMF.",
+        resultado:"(esperado) 'El copiloto habla primero' al extremo: te dice qué hacer antes de que preguntes.",
+        ruido:"Frontera lejana: el nivel 3, el norte del producto. Requiere datos, PMF y modelos — no es roadmap cercano." },
+    },
+    edges: [
+      { from:"riesgo", to:"patrones", lbl:"afinar con el ritmo real", crit:"sec",
+        nota:"Cable a frontera: los 3 tipos de regla fija (riesgo, parado, oportunidad) se afinarían con patrones aprendidos." },
+      { from:"patrones", to:"ia", lbl:"de aprender a predecir", crit:"sec",
+        nota:"Cable a frontera: el nivel 2 (patrones) es el escalón hacia el nivel 3 (predicción con IA)." },
+    ]
+  },
+
+  ficha: {
+    titulo: "Ficha del cliente", parent:"compartidos",
+    nodes: {
+      historial: { x:130, y:150, ic:"📜", label:"Historial de gestiones", rol:"Compartido", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Antes de visitar a un cliente hay que saber qué pasó las veces anteriores.",
+        definicion:"La línea de tiempo de todas las gestiones del local: qué resultado, qué día, con qué nota.",
+        como:"GestionTimeline sobre org_gestiones. Muestra 'hace X' con la fecha real de la visita (arreglado esta semana).",
+        resultado:"Cualquiera abre el cliente y entiende su historia completa de un vistazo.",
+        ruido:null },
+      contactos: { x:490, y:150, ic:"📇", label:"Contactos", rol:"Compartido", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita a quién llamar: nombre, cargo, teléfono, email de la persona del negocio.",
+        definicion:"Los datos de contacto del local: persona, cargo, teléfono y email.",
+        como:"local_contactos + campos de contacto del local. Teléfono de catálogo se ofrece confirmar con 1 tap.",
+        resultado:"El vendedor sabe con quién hablar y cómo, sin salir a buscarlo.",
+        ruido:null },
+      notas: { x:850, y:150, ic:"📝", label:"Notas del local", rol:"Compartido", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El contexto de un cliente ('pidió hablar con el dueño el jueves') tiene que quedar guardado.",
+        definicion:"Las notas dejadas en las visitas, visibles junto al historial.",
+        como:"datos_extra.nota de cada gestión, mostrada en la ficha (conectado esta semana — antes se guardaba y no se veía).",
+        resultado:"El contexto de cada cliente sobrevive entre visitas y entre vendedores.",
+        ruido:null },
+      estado: { x:310, y:380, ic:"🚦", label:"Estado y próximo contacto", rol:"Compartido", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Hay que saber en qué punto está el cliente (prospecto, cliente, en riesgo) y cuándo toca volver.",
+        definicion:"El estado del local para la org y su próximo contacto agendado.",
+        como:"org_locales_estado (estado + proximo_contacto_at). Editable desde la ficha.",
+        resultado:"De un vistazo: qué es este cliente para vos y cuándo hay que volver a verlo.",
+        ruido:null },
+      registrar: { x:670, y:380, ic:"📍", label:"Registrar gestión", rol:"Compartido", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Desde la ficha uno quiere poder registrar una visita sin ir a otra pantalla.",
+        definicion:"El botón que abre el check-in directamente sobre este local.",
+        como:"RegistroGestionSheet — el mismo check-in de Mi Día, disparado desde la ficha.",
+        resultado:"Registrar la visita sin perder el contexto del cliente que estás mirando.",
+        ruido:null },
+    },
+    edges: [
+      { from:"registrar", to:"historial", lbl:"suma al historial", crit:"vital",
+        nota:"Cada gestión registrada desde la ficha entra al historial del local. Es cómo se construye la historia." },
+      { from:"registrar", to:"estado", lbl:"actualiza estado", crit:"vital",
+        nota:"El resultado de la gestión cambia el estado del local y agenda el próximo contacto." },
+      { from:"contactos", to:"registrar", lbl:"a quién visité", crit:"sec",
+        nota:"El contacto da nombre a la persona con quien se hizo la gestión." },
+    ]
+  },
+
+  mapaLocales: {
+    titulo: "Mapa de locales", parent:"miDia",
+    nodes: {
+      pines: { x:130, y:150, ic:"📌", label:"Mapa con pines", rol:"Compartido · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor necesita ver sus clientes y prospectos en el territorio, no en una lista.",
+        definicion:"El mapa de Google con los locales geolocalizados, coloreados por estado.",
+        como:"LocalesMap sobre Google Maps + locales/org_locales_estado. Pin por estado del local.",
+        resultado:"El vendedor lee su territorio de un vistazo y elige a quién visitar por cercanía.",
+        ruido:null },
+      filtros: { x:490, y:150, ic:"🔎", label:"Filtros y búsqueda", rol:"Compartido · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Con miles de locales, el vendedor necesita filtrar por rubro y buscar uno puntual.",
+        definicion:"Filtros por rubro/estado y buscador de locales sobre el mapa.",
+        como:"SearchDropdown + filtros. El gate de rubro define qué locales son visibles (RLS).",
+        resultado:"El vendedor acota el mapa a lo que le importa y encuentra un local por nombre.",
+        ruido:null },
+      panelRuta: { x:850, y:150, ic:"🧭", label:"Panel de ruta activa", rol:"Vendedor · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Cuando el vendedor arma un recorrido, necesita verlo y seguirlo sin perderse.",
+        definicion:"El panel de la ruta en curso: paradas, resumen y barra de ruta activa.",
+        como:"RutaPanel + ActiveRouteBar + RouteSummary. Se conecta con la Ruta del día.",
+        resultado:"El vendedor sigue su recorrido paso a paso desde el mapa.",
+        ruido:null },
+      transporte: { x:310, y:380, ic:"🚶", label:"Modo de transporte", rol:"Vendedor · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El tiempo entre paradas cambia si vas a pie, en auto o en transporte público.",
+        definicion:"Selector de cómo se mueve el vendedor, que ajusta tiempos y trazado.",
+        como:"TransportSelector.",
+        resultado:"Tiempos de ruta más realistas según cómo se desplaza el vendedor.",
+        ruido:null },
+      nuevoNeg: { x:670, y:380, ic:"➕", label:"Crear negocio nuevo", rol:"Compartido · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor encuentra en terreno un local que no está en el catálogo y quiere sumarlo al toque.",
+        definicion:"Agregar un negocio nuevo desde el mapa, en el punto donde está.",
+        como:"NewBusinessPopup → crea el local (fix de columnas aplicado en PR #76 de Diego).",
+        resultado:"El catálogo crece con lo que el vendedor descubre caminando — no solo con scraping.",
+        ruido:null },
+    },
+    edges: [
+      { from:"pines", to:"panelRuta", lbl:"arma el recorrido", crit:"vital",
+        nota:"Desde los pines del mapa se construye la ruta activa que el vendedor sigue." },
+      { from:"filtros", to:"pines", lbl:"acota qué se ve", crit:"vital",
+        nota:"El filtro de rubro determina qué locales aparecen como pines. Sin filtro correcto, el mapa muestra de más o de menos." },
+      { from:"transporte", to:"panelRuta", lbl:"ajusta tiempos", crit:"sec",
+        nota:"El modo de transporte afina los tiempos del recorrido; útil, no crítico." },
+      { from:"nuevoNeg", to:"pines", lbl:"suma un pin", crit:"sec",
+        nota:"Un negocio creado a mano aparece como pin nuevo en el mapa." },
+    ]
+  },
+
+  descubrimiento: {
+    titulo: "Descubrimiento (scraping)", parent:"plataforma",
+    nodes: {
+      area: { x:130, y:150, ic:"📐", label:"Selector de área", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Antes de scrapear hay que decidir dónde — qué comuna, qué rubros — sin repetir lo ya hecho.",
+        definicion:"La UI para elegir la zona y los rubros a scrapear, con aviso anti-repetición.",
+        como:"ScrapingAreaPicker + historial de zonas ya scrapeadas (aviso si la comuna+rubro ya se corrió).",
+        resultado:"El admin dispara scraping donde falta, sin gastar cuota repitiendo zonas.",
+        ruido:null },
+      prospectar: { x:490, y:150, ic:"🎯", label:"Prospectar locales", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Traer los negocios de un área concreta, bajo demanda.",
+        definicion:"Búsqueda de locales en la zona elegida.",
+        como:"Edge Function prospectar-locales.",
+        resultado:"Los negocios de esa zona entran al catálogo para enriquecer y limpiar.",
+        ruido:null },
+      masivo: { x:850, y:150, ic:"🌊", label:"Scraping masivo", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Para poblar el catálogo de entrada hace falta un barrido grande, no local por local.",
+        definicion:"Barrido masivo de locales sobre muchas zonas.",
+        como:"Edge Function scraping-masivo.",
+        resultado:"El catálogo se llena a escala — la base sobre la que arranca todo.",
+        ruido:null },
+      scrapers: { x:490, y:380, ic:"🕷️", label:"Fuentes de delivery", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Los negocios gastronómicos ya están listados en las apps de delivery — es la mejor fuente.",
+        definicion:"Los scrapers de las plataformas: Rappi, UberEats, PedidosYa, Justo.",
+        como:"Scrapers dedicados (Tier 2-3, Camoufox para los duros). Viven en territoria-brain/scripts.",
+        resultado:"Miles de locales reales con dirección, rubro y a veces teléfono — la materia prima del catálogo.",
+        ruido:null },
+    },
+    edges: [
+      { from:"area", to:"prospectar", lbl:"define dónde", crit:"vital",
+        nota:"El selector de área es lo que le dice a prospectar/masivo qué zona barrer." },
+      { from:"area", to:"masivo", lbl:"define el barrido", crit:"vital",
+        nota:"Mismo selector alimenta el scraping masivo." },
+      { from:"scrapers", to:"prospectar", lbl:"la fuente cruda", crit:"vital",
+        nota:"Los scrapers de delivery son de dónde salen los locales que prospectar trae al catálogo." },
+    ]
+  },
+
+  dedup: {
+    titulo: "Deduplicación y limpieza", parent:"plataforma",
+    nodes: {
+      exacto: { x:130, y:150, ic:"🟰", label:"Match exacto", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El mismo negocio scrapeado dos veces con RUT o dirección idénticos es un duplicado obvio.",
+        definicion:"Detección de duplicados por coincidencia exacta (RUT, dirección).",
+        como:"RPC find_match_exact. RUT como señal fuerte.",
+        resultado:"Los duplicados evidentes se cazan antes de ensuciar el catálogo.",
+        ruido:null },
+      similar: { x:490, y:150, ic:"≈", label:"Match similar", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El mismo negocio aparece con nombres parecidos ('Café Roble' vs 'Cafetería El Roble') — hay que detectarlo.",
+        definicion:"Detección de duplicados por similitud de nombre y cercanía.",
+        como:"RPC find_match_similar + find_duplicate_locals, con guard de distancia/dirección.",
+        resultado:"Los duplicados no obvios se detectan sin fusionar negocios que en realidad son distintos.",
+        ruido:null },
+      fusion: { x:850, y:150, ic:"🔗", label:"Fusión", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Detectado un duplicado, hay que combinarlo en un solo registro sin perder datos.",
+        definicion:"Fusión de dos locales duplicados en uno, conservando lo mejor de cada uno.",
+        como:"RPC merge_duplicate_locals (con guard anti-fusiones-falsas, tras el incidente de las 38 fusiones).",
+        resultado:"Un negocio, un registro — el catálogo se mantiene limpio y confiable.",
+        ruido:null },
+      dark: { x:310, y:380, ic:"👻", label:"Dark kitchens", rol:"Admin · Diego", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Las cocinas fantasma (varias 'marcas' en una misma cocina) inflan el catálogo con negocios que no son locales reales.",
+        definicion:"Detección de dark kitchens para no contarlas como locales visitables.",
+        como:"RPC detect_dark_kitchens.",
+        resultado:"El vendedor no pierde tiempo yendo a una dirección donde hay 8 'negocios' que son una sola cocina.",
+        ruido:null },
+      cola: { x:670, y:380, ic:"⛔", label:"Cola de cadenas", rol:"Admin · Diego", estado:"idea", madurez:1, drill:null,
+        necesidad:"Cuando se reporta una cadena grande, hay que revisarla y excluirla del catálogo SMB.",
+        definicion:"La cola de aprobación de cadenas reportadas para excluir.",
+        como:"ColaAprobacionCadenas + match-cadena-reportada, sobre la tabla cadenas_excluidas — que NO existe en prod.",
+        resultado:"(esperado) Las cadenas grandes quedan fuera, el catálogo se queda con SMBs.",
+        ruido:"ROTO: apunta a cadenas_excluidas, tabla fantasma. El mismo hallazgo del filtro anti-cadenas — revisar con Diego." },
+    },
+    edges: [
+      { from:"exacto", to:"fusion", lbl:"candidato a fusionar", crit:"vital",
+        nota:"Los matches exactos alimentan la fusión — son los duplicados más seguros." },
+      { from:"similar", to:"fusion", lbl:"candidato a revisar", crit:"vital",
+        nota:"Los matches similares también van a fusión, con más cuidado (guard de distancia)." },
+      { from:"dark", to:"fusion", lbl:"marca no-local", crit:"sec",
+        nota:"Las dark kitchens se marcan para no tratarlas como locales visitables." },
+    ]
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────────────────────
+const MAD_LBL = { 1:"reglas", 2:"patrones", 3:"IA" };
+const world = document.getElementById('world');
+const svg = document.getElementById('cables');
+const tip = document.getElementById('tip');
+const crumbCur = document.getElementById('crumb-cur');
+const crumbBox = document.getElementById('crumb');
+
+let vista = "root";
+let pan = { x: 60, y: 40 }, scale = 1;
+const nodeEls = {};
+
+function render(vid){
+  vista = vid;
+  world.querySelectorAll('.node').forEach(n=>n.remove());
+  svg.innerHTML = '';
+  for(const k in nodeEls) delete nodeEls[k];
+  const V = VISTAS[vid];
+
+  // crumb
+  const chain = [];
+  let cur = vid;
+  while(cur){ chain.unshift(cur); cur = VISTAS[cur].parent; }
+  crumbBox.innerHTML = chain.map((vv,i)=>{
+    if(i===chain.length-1) return '<span class="cur">'+VISTAS[vv].titulo+'</span>';
+    return '<button data-v="'+vv+'">'+VISTAS[vv].titulo+'</button><span class="sep">›</span>';
+  }).join('');
+  crumbBox.querySelectorAll('button[data-v]').forEach(b=>{
+    b.onclick = ()=>{ render(b.dataset.v); fit(); };
+  });
+
+  // nodos
+  for(const id in V.nodes){
+    const n = V.nodes[id];
+    const el = document.createElement('div');
+    el.className = 'node '+n.estado;
+    el.style.left = n.x+'px'; el.style.top = n.y+'px';
+    const dots = [1,2,3].map(l=>'<span class="dot '+(l<=n.madurez?'on':'')+'"></span>').join('');
+    el.innerHTML =
+      (n.ruido?'<span class="ruido-badge">RUIDO</span>':'')+
+      '<div class="top"><span class="ic">'+n.ic+'</span><h3>'+n.label+'</h3></div>'+
+      '<div class="rol">'+n.rol+'</div>'+
+      '<div class="barra"><div class="madurez">'+dots+'<span class="lbl">'+MAD_LBL[n.madurez]+'</span></div>'+
+      (n.drill?'<span class="drill">abrir ▸</span>':'')+'</div>';
+    world.appendChild(el);
+    nodeEls[id] = el;
+
+    // hover tooltip
+    el.addEventListener('mouseenter', e=>showTip(n, e));
+    el.addEventListener('mousemove', moveTip);
+    el.addEventListener('mouseleave', hideTip);
+    // drill
+    if(n.drill){
+      el.addEventListener('dblclick', ()=>{ render(n.drill); fit(); });
+      el.querySelector('.drill').addEventListener('click', ev=>{ ev.stopPropagation(); render(n.drill); fit(); });
+    }
+    makeDraggable(el, id);
+  }
+  drawCables();
+}
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+function drawCables(){
+  const V = VISTAS[vista];
+  svg.innerHTML =
+    '<defs>'+
+    '<marker id="ar-vital" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'+
+      '<path d="M0,0 L10,5 L0,10 z" fill="#5bd0ff"/></marker>'+
+    '<marker id="ar-sec" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">'+
+      '<path d="M0,0 L10,5 L0,10 z" fill="#3a4757"/></marker>'+
+    '</defs>';
+  V.edges.forEach(e=>{
+    const a = V.nodes[e.from], b = V.nodes[e.to];
+    if(!a||!b) return;
+    const cls = e.crit==='vital'?'vital':'sec';
+    // conectar del borde derecho/izquierdo o inferior según posición
+    const ax = a.x+105, ay = a.y+42, bx = b.x+105, by = b.y+42;
+    const dx = Math.abs(bx-ax)*0.5, dy = Math.abs(by-ay)*0.3;
+    const path = document.createElementNS(SVGNS,'path');
+    path.setAttribute('d', `M ${ax} ${ay} C ${ax+dx} ${ay+dy}, ${bx-dx} ${by-dy}, ${bx} ${by}`);
+    path.setAttribute('class','cable '+cls);
+    path.setAttribute('marker-end', cls==='vital'?'url(#ar-vital)':'url(#ar-sec)');
+    if(e.nota){
+      path.style.pointerEvents='stroke';
+      path.addEventListener('mouseenter', ev=>showEdgeTip(e, ev));
+      path.addEventListener('mousemove', moveTip);
+      path.addEventListener('mouseleave', hideTip);
+    }
+    svg.appendChild(path);
+    if(e.lbl){
+      const t = document.createElementNS(SVGNS,'text');
+      t.setAttribute('x',(ax+bx)/2); t.setAttribute('y',(ay+by)/2-4);
+      t.setAttribute('text-anchor','middle'); t.setAttribute('class','cable-lbl '+cls);
+      t.textContent = e.lbl;
+      svg.appendChild(t);
+    }
+  });
+}
+function showEdgeTip(e, ev){
+  const critTxt = e.crit==='vital'
+    ? '<span style="color:#8fdcff">● VITAL</span> — si se corta, lo de abajo deja de funcionar'
+    : '<span style="color:#8a97a5">○ Secundaria</span> — ayuda, pero no es crítica';
+  tip.innerHTML =
+    '<div class="t-head">'+e.from+' → '+e.to+'</div>'+
+    '<div class="t-field f-what"><span class="t-lbl">Qué transporta</span><p>'+e.lbl+'</p></div>'+
+    '<div class="t-field f-why"><span class="t-lbl">Criticidad</span><p>'+critTxt+'</p></div>'+
+    '<div class="t-field f-how"><span class="t-lbl">Por qué</span><p>'+e.nota+'</p></div>';
+  tip.classList.add('show'); moveTip(ev);
+}
+
+// ─── tooltip ───
+function showTip(n, e){
+  tip.innerHTML =
+    '<div class="t-head"><span class="t-ic">'+n.ic+'</span>'+n.label+'</div>'+
+    '<div class="t-field f-why"><span class="t-lbl">Necesidad que responde</span><p>'+n.necesidad+'</p></div>'+
+    '<div class="t-field f-what"><span class="t-lbl">Qué es</span><p>'+n.definicion+'</p></div>'+
+    '<div class="t-field f-how"><span class="t-lbl">Cómo</span><p>'+n.como+'</p></div>'+
+    '<div class="t-field f-goal"><span class="t-lbl">Qué se espera obtener</span><p>'+n.resultado+'</p></div>'+
+    (n.ruido?'<div class="t-ruido">⚠ '+n.ruido+'</div>':'');
+  tip.classList.add('show'); moveTip(e);
+}
+function moveTip(e){
+  const pad=16; let x=e.clientX+pad, y=e.clientY+pad;
+  const r=tip.getBoundingClientRect();
+  if(x+r.width>innerWidth) x=e.clientX-r.width-pad;
+  if(y+r.height>innerHeight) y=e.clientY-r.height-pad;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){ tip.classList.remove('show'); }
+
+// ─── drag de nodos ───
+function makeDraggable(el, id){
+  let sx,sy,ox,oy,drag=false;
+  el.addEventListener('mousedown', e=>{
+    if(e.target.classList.contains('drill')) return;
+    drag=true; el.style.zIndex=10; hideTip();
+    sx=e.clientX; sy=e.clientY;
+    ox=VISTAS[vista].nodes[id].x; oy=VISTAS[vista].nodes[id].y;
+    e.stopPropagation();
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!drag) return;
+    VISTAS[vista].nodes[id].x = ox+(e.clientX-sx)/scale;
+    VISTAS[vista].nodes[id].y = oy+(e.clientY-sy)/scale;
+    el.style.left=VISTAS[vista].nodes[id].x+'px';
+    el.style.top=VISTAS[vista].nodes[id].y+'px';
+    drawCables();
+  });
+  window.addEventListener('mouseup', ()=>{ drag=false; el.style.zIndex=''; });
+}
+
+// ─── pan + zoom del canvas ───
+const vp = document.getElementById('viewport');
+let panning=false, psx,psy,pox,poy;
+vp.addEventListener('mousedown', e=>{
+  if(e.target.closest('.node')) return;
+  panning=true; vp.classList.add('panning');
+  psx=e.clientX; psy=e.clientY; pox=pan.x; poy=pan.y;
+});
+window.addEventListener('mousemove', e=>{
+  if(!panning) return;
+  pan.x=pox+(e.clientX-psx); pan.y=poy+(e.clientY-psy); applyTransform();
+});
+window.addEventListener('mouseup', ()=>{ panning=false; vp.classList.remove('panning'); });
+vp.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const d = e.deltaY<0?1.1:0.9;
+  const ns = Math.min(2, Math.max(0.4, scale*d));
+  // zoom hacia el cursor
+  pan.x = e.clientX-(e.clientX-pan.x)*(ns/scale);
+  pan.y = e.clientY-(e.clientY-pan.y)*(ns/scale);
+  scale=ns; applyTransform();
+},{passive:false});
+
+function applyTransform(){ world.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`; }
+function fit(){ pan={x:60,y:40}; scale=1; applyTransform(); }
+
+document.getElementById('zin').onclick =()=>{ scale=Math.min(2,scale*1.15); applyTransform(); };
+document.getElementById('zout').onclick=()=>{ scale=Math.max(0.4,scale*0.87); applyTransform(); };
+document.getElementById('zreset').onclick=fit;
+
+// init
+// ─── leyenda colapsable ───
+const legendEl = document.getElementById('legend');
+const legendTab = document.getElementById('legend-tab');
+document.getElementById('legend-close').onclick = ()=>{ legendEl.classList.add('collapsed'); legendTab.classList.add('show'); };
+legendTab.onclick = ()=>{ legendEl.classList.remove('collapsed'); legendTab.classList.remove('show'); };
+
+applyTransform();
+render("root");
+</script>
+</body>
+</html>
