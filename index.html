@@ -86,9 +86,12 @@
     border-top:1px solid var(--linea);padding-top:9px}
 
   /* chrome */
-  #hud{position:fixed;top:16px;left:18px;z-index:40}
-  #hud h1{font-size:16px;font-weight:800;letter-spacing:-.02em}
-  #hud .sub{font-size:11.5px;color:var(--tinta-3);margin-top:2px}
+  #hud{position:fixed;top:16px;left:18px;right:18px;z-index:45;
+    display:grid;grid-template-columns:1fr auto;column-gap:18px;align-items:start}
+  #hud h1{font-size:16px;font-weight:800;letter-spacing:-.02em;grid-column:1}
+  #hud .sub{grid-column:1}
+  #hud #meta{grid-column:2;grid-row:1 / span 2}
+  #hud .sub{font-size:11.5px;color:var(--tinta-3);margin-top:2px;max-width:52ch}
   #crumb{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:40;
     display:flex;align-items:center;gap:7px;background:var(--panel);
     border:1px solid var(--linea);border-radius:10px;padding:7px 13px;font-size:12.5px}
@@ -130,13 +133,108 @@
   #zoomhud button{width:34px;height:34px;background:var(--panel);border:1px solid var(--linea);
     border-radius:9px;color:var(--tinta);font-size:17px;cursor:pointer;font-weight:600}
   #zoomhud button:hover{border-color:var(--cable-activo)}
+
+  /* ── cuadro de versión (meta) ───────────────────────────── */
+  #meta{position:fixed;top:16px;right:18px;z-index:42;display:flex;
+    flex-direction:column;align-items:flex-end;gap:7px}
+  #meta-chip{display:flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--linea);border-radius:10px;padding:7px 11px;cursor:pointer;
+    color:var(--tinta-2);font-size:11.5px;font-weight:600;white-space:nowrap;
+    box-shadow:0 4px 14px rgba(0,0,0,.3);font-family:inherit}
+  #meta-chip:hover{border-color:var(--cable-activo);color:var(--tinta)}
+  #meta-chip .pip{width:7px;height:7px;border-radius:50%;background:var(--vivo);flex:none}
+  #meta-chip .pip.stale{background:var(--obra);box-shadow:0 0 0 3px var(--obra-glow)}
+  #meta-chip .caret{color:var(--tinta-3);font-size:9px;transition:transform .15s}
+  #meta.open #meta-chip .caret{transform:rotate(180deg)}
+  #meta-panel{width:300px;background:var(--panel);border:1px solid var(--linea);
+    border-radius:12px;padding:14px 15px;box-shadow:0 14px 34px rgba(0,0,0,.55);display:none}
+  #meta.open #meta-panel{display:block}
+  #meta-panel .m-t{font-weight:800;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--tinta-3);margin-bottom:5px}
+  #meta-panel .m-big{font-size:16px;font-weight:800;color:var(--tinta);letter-spacing:-.015em}
+  #meta-panel .m-sub{color:var(--tinta-2);font-size:11.5px;margin-top:3px;line-height:1.5}
+  #meta-panel .m-nota{color:var(--tinta-3);font-size:11px;margin-top:7px;line-height:1.5}
+  #meta-panel .m-sep{height:1px;background:var(--linea);margin:12px 0}
+  #meta-panel .m-pr{color:var(--cable-activo);font-weight:800}
+  #meta-panel .m-commit{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:10.5px;color:var(--tinta-3);margin-top:4px}
+  #meta-panel .m-flag{margin-top:11px;padding:9px 11px;border-radius:9px;
+    font-size:11px;line-height:1.5}
+  #meta-panel .m-flag.warn{background:rgba(217,164,6,.12);border:1px solid rgba(217,164,6,.38);color:#e8c15a}
+  #meta-panel .m-flag.ok{background:rgba(47,158,68,.1);border:1px solid rgba(47,158,68,.32);color:#7fc98f}
+  #meta-panel .m-cnt{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  #meta-panel .m-pill{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px;
+    border:1px solid var(--linea);color:var(--tinta-2)}
+  #meta-panel .m-pill.v{border-color:var(--vivo);color:#7fc98f}
+  #meta-panel .m-pill.o{border-color:var(--obra);color:#e8c15a}
+  #meta-panel .m-pill.i{border-color:var(--idea);color:var(--tinta-3)}
+
+  /* ── zona de toque de los cables ── */
+  .cable-hit{fill:none;stroke:transparent;stroke-width:26;pointer-events:stroke;cursor:pointer}
+
+  /* ── ficha como hoja inferior (móvil) ── */
+  #tip .t-grab,#tip .t-open{display:none}
+  #tip.sheet{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;
+    max-height:66vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    border-radius:18px 18px 0 0;border-left:0;border-right:0;border-bottom:0;
+    padding:9px 18px calc(20px + env(safe-area-inset-bottom,0px));
+    pointer-events:auto;opacity:1;transform:translateY(102%);
+    transition:transform .24s cubic-bezier(.32,.72,0,1);
+    box-shadow:0 -16px 44px rgba(0,0,0,.62)}
+  #tip.sheet.show{transform:translateY(0)}
+  #tip.sheet .t-grab{display:block;width:38px;height:4px;border-radius:99px;
+    background:var(--linea);margin:0 auto 13px}
+  #tip.sheet .t-head{font-size:12.5px}
+  #tip.sheet .t-field p{font-size:13.5px}
+  #tip.sheet .t-open{display:flex;align-items:center;justify-content:center;gap:7px;
+    width:100%;margin-top:15px;padding:13px;border-radius:11px;
+    border:1px solid var(--cable-activo);background:rgba(91,127,181,.15);
+    color:#9fc0ee;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit}
+
+  /* ── pista de primer uso ── */
+  #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:43;
+    background:var(--panel);border:1px solid var(--linea);border-radius:999px;
+    padding:9px 16px;font-size:12px;color:var(--tinta-2);display:none;
+    box-shadow:0 6px 22px rgba(0,0,0,.45);transition:opacity .3s}
+  #hint.show{display:block}
+
+  /* ── MÓVIL ──────────────────────────────────────────────── */
+  @media (max-width:820px), (max-height:560px){
+    #hud{top:0;left:0;right:0;padding:11px 12px 9px;display:flex;
+      align-items:center;gap:10px;
+      background:linear-gradient(180deg,var(--bg) 68%,rgba(14,17,22,0))}
+    #hud h1{font-size:14px;flex:1;min-width:0;overflow:hidden;
+      text-overflow:ellipsis;white-space:nowrap}
+    #hud .sub{display:none}
+    #meta{position:static;flex:none;align-items:flex-end}
+    #meta-chip{padding:7px 10px;font-size:11px}
+    #meta-panel{position:fixed;top:58px;left:12px;right:12px;width:auto;z-index:44;
+      max-height:calc(100vh - 130px);overflow-y:auto}
+    #crumb{top:54px;left:50%;right:auto;transform:translateX(-50%);
+      width:max-content;max-width:calc(100vw - 24px);padding:6px 12px;font-size:12.5px;
+      overflow-x:auto;white-space:nowrap;scrollbar-width:none;justify-content:flex-start}
+    #crumb::-webkit-scrollbar{display:none}
+    #legend{bottom:auto;top:98px;left:12px;right:12px;max-width:none;
+      max-height:calc(100vh - 118px);overflow-y:auto}
+    #legend-tab{bottom:14px;left:12px;width:46px;height:46px;font-size:19px}
+    #zoomhud{bottom:14px;right:12px;gap:8px}
+    #zoomhud button{width:46px;height:46px;font-size:20px}
+    .node{box-shadow:0 4px 14px rgba(0,0,0,.4)}
+    .node:hover{transform:none}
+  }
 </style>
 </head>
 <body>
 
 <div id="hud">
   <h1>🗺️ Mapa de Producto · Territoria</h1>
-  <div class="sub">v0.8 · el <b>Chat</b> abre mundo propio y la <b>Dirección Territorial</b> estrena el mundo del Dueño · la <b>voz</b> deja de ser frontera y pasa a <b style="color:#e0b330">obra</b> — graba, pero todavía nadie la transcribe · corregido: invitar por email <b>no</b> está desplegado — las líneas gruesas y brillantes son <b style="color:#8fdcff">arterias vitales</b> · hover en nodo o en línea para el detalle</div>
+  <div class="sub">Las líneas gruesas y brillantes son <b style="color:#8fdcff">arterias vitales</b> · pasá el mouse por un nodo o una línea para el detalle · qué entró en esta versión, en el cuadro de la derecha ▸</div>
+  <div id="meta">
+    <button id="meta-chip" title="Versión del mapa y último merge">
+      <span class="pip" id="meta-pip"></span><span id="meta-chip-txt">v0.8</span><span class="caret">▼</span>
+    </button>
+    <div id="meta-panel"></div>
+  </div>
 </div>
 
 <div id="crumb"><span class="cur" id="crumb-cur">Vista general</span></div>
@@ -164,6 +262,8 @@
 </div>
 
 <button id="legend-tab" title="Mostrar leyenda">ℹ</button>
+
+<div id="hint">Tocá un nodo para leerlo · pellizcá para acercar</div>
 
 <div id="zoomhud">
   <button id="zout">−</button><button id="zin">+</button><button id="zreset">⤢</button>
@@ -1022,6 +1122,25 @@ const VISTAS = {
 // ─────────────────────────────────────────────────────────────
 // RENDER
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// META — ⚠️ ACTUALIZAR A MANO cada vez que se regenera el mapa.
+// El archivo es autocontenido y no tiene red: no puede consultar GitHub.
+// Los conteos NO se hornean: se calculan solos desde VISTAS más abajo.
+// ─────────────────────────────────────────────────────────────
+const META = {
+  version:     "v0.8",
+  actualizado: "2026-08-20",
+  nota:        "El Chat abrió mundo propio y la Dirección Territorial estrenó el mundo del Dueño. La voz dejó de ser frontera y pasó a obra. Corregido: invitar por email no está desplegado.",
+  merge: {
+    pr:      "#161",
+    hash:    "cc3924c",
+    fecha:   "2026-08-23",
+    titulo:  "feat(voz): banco de pruebas de la extracción"
+  },
+  // merges que entraron a main DESPUÉS de la última actualización del mapa
+  pendientes: 3
+};
+
 const MAD_LBL = { 1:"reglas", 2:"patrones", 3:"IA" };
 const world = document.getElementById('world');
 const svg = document.getElementById('cables');
@@ -1057,6 +1176,7 @@ function render(vid){
     const n = V.nodes[id];
     const el = document.createElement('div');
     el.className = 'node '+n.estado;
+    el.dataset.id = id;
     el.style.left = n.x+'px'; el.style.top = n.y+'px';
     const dots = [1,2,3].map(l=>'<span class="dot '+(l<=n.madurez?'on':'')+'"></span>').join('');
     el.innerHTML =
@@ -1104,10 +1224,15 @@ function drawCables(){
     path.setAttribute('class','cable '+cls);
     path.setAttribute('marker-end', cls==='vital'?'url(#ar-vital)':'url(#ar-sec)');
     if(e.nota){
-      path.style.pointerEvents='stroke';
-      path.addEventListener('mouseenter', ev=>showEdgeTip(e, ev));
-      path.addEventListener('mousemove', moveTip);
-      path.addEventListener('mouseleave', hideTip);
+      // franja invisible y ancha: hace el cable tocable con el dedo
+      const hit = document.createElementNS(SVGNS,'path');
+      hit.setAttribute('d', path.getAttribute('d'));
+      hit.setAttribute('class','cable-hit');
+      hit.__edge = e;
+      hit.addEventListener('mouseenter', ev=>showEdgeTip(e, ev));
+      hit.addEventListener('mousemove', moveTip);
+      hit.addEventListener('mouseleave', hideTip);
+      svg.appendChild(hit);
     }
     svg.appendChild(path);
     if(e.lbl){
@@ -1124,25 +1249,38 @@ function showEdgeTip(e, ev){
     ? '<span style="color:#8fdcff">● VITAL</span> — si se corta, lo de abajo deja de funcionar'
     : '<span style="color:#8a97a5">○ Secundaria</span> — ayuda, pero no es crítica';
   tip.innerHTML =
+    '<span class="t-grab"></span>'+
     '<div class="t-head">'+e.from+' → '+e.to+'</div>'+
     '<div class="t-field f-what"><span class="t-lbl">Qué transporta</span><p>'+e.lbl+'</p></div>'+
     '<div class="t-field f-why"><span class="t-lbl">Criticidad</span><p>'+critTxt+'</p></div>'+
     '<div class="t-field f-how"><span class="t-lbl">Por qué</span><p>'+e.nota+'</p></div>';
-  tip.classList.add('show'); moveTip(ev);
+  applyTipMode();
+  tip.classList.add('show');
+  if(ev) moveTip(ev);
 }
 
 // ─── tooltip ───
+const sheetMode = ()=> innerWidth <= 820 || innerHeight <= 560;
+function applyTipMode(){ tip.classList.toggle('sheet', sheetMode()); }
+
 function showTip(n, e){
   tip.innerHTML =
+    '<span class="t-grab"></span>'+
     '<div class="t-head"><span class="t-ic">'+n.ic+'</span>'+n.label+'</div>'+
     '<div class="t-field f-why"><span class="t-lbl">Necesidad que responde</span><p>'+n.necesidad+'</p></div>'+
     '<div class="t-field f-what"><span class="t-lbl">Qué es</span><p>'+n.definicion+'</p></div>'+
     '<div class="t-field f-how"><span class="t-lbl">Cómo</span><p>'+n.como+'</p></div>'+
     '<div class="t-field f-goal"><span class="t-lbl">Qué se espera obtener</span><p>'+n.resultado+'</p></div>'+
-    (n.ruido?'<div class="t-ruido">⚠ '+n.ruido+'</div>':'');
-  tip.classList.add('show'); moveTip(e);
+    (n.ruido?'<div class="t-ruido">⚠ '+n.ruido+'</div>':'')+
+    (n.drill&&VISTAS[n.drill]?'<button class="t-open" data-drill="'+n.drill+'">Abrir «'+VISTAS[n.drill].titulo+'» ▸</button>':'');
+  applyTipMode();
+  tip.classList.add('show');
+  if(e) moveTip(e);
+  const ob = tip.querySelector('.t-open');
+  if(ob) ob.onclick = ()=>{ hideTip(); render(ob.dataset.drill); fit(); };
 }
 function moveTip(e){
+  if(sheetMode()) return;   // en hoja inferior la posición la manda el CSS
   const pad=16; let x=e.clientX+pad, y=e.clientY+pad;
   const r=tip.getBoundingClientRect();
   if(x+r.width>innerWidth) x=e.clientX-r.width-pad;
@@ -1195,8 +1333,77 @@ vp.addEventListener('wheel', e=>{
   scale=ns; applyTransform();
 },{passive:false});
 
+// ─── gestos táctiles: 1 dedo arrastra, 2 dedos acercan, un toque abre la ficha ───
+function tDist(a,b){ return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY); }
+let tMode=null, tsx=0,tsy=0,tox=0,toy=0,tMoved=0,
+    pD0=1,pS0=1,pPanX=0,pPanY=0,pCx=0,pCy=0,
+    tapNode=null, tapEdge=null;
+
+vp.addEventListener('touchstart', ev=>{
+  hideHint();
+  if(ev.touches.length===1){
+    const t=ev.touches[0], el=ev.target;
+    tMode='pan'; tMoved=0; tsx=t.clientX; tsy=t.clientY; tox=pan.x; toy=pan.y;
+    // si el toque cae sobre el chip "abrir ▸", dejamos que el click nativo navegue
+    const onDrill = el.classList && el.classList.contains('drill');
+    tapNode = (!onDrill && el.closest) ? el.closest('.node') : null;
+    const cls = (el.getAttribute && el.getAttribute('class')) || '';
+    tapEdge = cls.indexOf('cable-hit')>=0 ? el : null;
+  } else if(ev.touches.length===2){
+    tMode='pinch'; tapNode=null; tapEdge=null;
+    pD0=tDist(ev.touches[0],ev.touches[1])||1; pS0=scale;
+    pPanX=pan.x; pPanY=pan.y;
+    pCx=(ev.touches[0].clientX+ev.touches[1].clientX)/2;
+    pCy=(ev.touches[0].clientY+ev.touches[1].clientY)/2;
+  }
+},{passive:true});
+
+vp.addEventListener('touchmove', ev=>{
+  if(tMode==='pan' && ev.touches.length===1){
+    const t=ev.touches[0], dx=t.clientX-tsx, dy=t.clientY-tsy;
+    tMoved=Math.max(tMoved, Math.hypot(dx,dy));
+    pan.x=tox+dx; pan.y=toy+dy; applyTransform(); ev.preventDefault();
+  } else if(tMode==='pinch' && ev.touches.length===2){
+    const ns=Math.min(2.2, Math.max(0.2, pS0*(tDist(ev.touches[0],ev.touches[1])/pD0)));
+    pan.x=pCx-(pCx-pPanX)*(ns/pS0);
+    pan.y=pCy-(pCy-pPanY)*(ns/pS0);
+    scale=ns; applyTransform(); ev.preventDefault();
+  }
+},{passive:false});
+
+vp.addEventListener('touchend', ev=>{
+  if(tMode==='pan' && tMoved<11){          // fue un toque, no un arrastre
+    if(tapNode){
+      const n=VISTAS[vista].nodes[tapNode.dataset.id];
+      if(n) showTip(n, null);
+    } else if(tapEdge && tapEdge.__edge){
+      showEdgeTip(tapEdge.__edge, null);
+    } else hideTip();
+  }
+  if(ev.touches.length===0){ tMode=null; tapNode=null; tapEdge=null; }
+},{passive:true});
+
 function applyTransform(){ world.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`; }
-function fit(){ pan={x:60,y:40}; scale=1; applyTransform(); }
+
+// Encuadra TODOS los nodos del mundo actual dentro de la pantalla.
+// Antes fijaba pan/scale a ciegas y en un teléfono dejaba el mapa fuera de cuadro.
+function fit(){
+  const V=VISTAS[vista], arr=Object.values(V.nodes);
+  if(!arr.length){ pan={x:60,y:40}; scale=1; return applyTransform(); }
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  arr.forEach(n=>{
+    minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+210); maxY=Math.max(maxY,n.y+128);
+  });
+  const w=Math.max(1,maxX-minX), h=Math.max(1,maxY-minY);
+  const narrow=sheetMode();
+  const padX=narrow?14:40, top=narrow?100:112, bot=narrow?74:80;
+  const aw=Math.max(140,innerWidth-padX*2), ah=Math.max(140,innerHeight-top-bot);
+  scale=Math.max(0.22, Math.min(aw/w, ah/h, 1));
+  pan.x=padX+(aw-w*scale)/2-minX*scale;
+  pan.y=top +(ah-h*scale)/2-minY*scale;
+  applyTransform();
+}
 
 document.getElementById('zin').onclick =()=>{ scale=Math.min(2,scale*1.15); applyTransform(); };
 document.getElementById('zout').onclick=()=>{ scale=Math.max(0.4,scale*0.87); applyTransform(); };
@@ -1209,8 +1416,68 @@ const legendTab = document.getElementById('legend-tab');
 document.getElementById('legend-close').onclick = ()=>{ legendEl.classList.add('collapsed'); legendTab.classList.add('show'); };
 legendTab.onclick = ()=>{ legendEl.classList.remove('collapsed'); legendTab.classList.remove('show'); };
 
-applyTransform();
+// ─── cuadro de versión ───
+const metaBox=document.getElementById('meta');
+function renderMeta(){
+  // conteos calculados en vivo desde VISTAS: nunca pueden mentir
+  let nodos=0, aristas=0, est={vivo:0,obra:0,idea:0};
+  const mundos=Object.keys(VISTAS).length;
+  for(const k in VISTAS){
+    const V=VISTAS[k]; aristas+=V.edges.length;
+    for(const id in V.nodes){ nodos++; est[V.nodes[id].estado]++; }
+  }
+  const fmt=iso=>{
+    const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const [y,m,d]=iso.split('-');
+    return parseInt(d,10)+' '+M[parseInt(m,10)-1]+' '+y;
+  };
+  const stale=META.pendientes>0;
+  document.getElementById('meta-chip-txt').textContent=
+    META.version+' · main '+META.merge.pr;
+  document.getElementById('meta-pip').className='pip'+(stale?' stale':'');
+  document.getElementById('meta-panel').innerHTML=
+    '<div class="m-t">Este mapa</div>'+
+    '<div class="m-big">'+META.version+'</div>'+
+    '<div class="m-sub">Actualizado el '+fmt(META.actualizado)+'</div>'+
+    '<div class="m-cnt">'+
+      '<span class="m-pill">'+mundos+' mundos</span>'+
+      '<span class="m-pill">'+nodos+' nodos</span>'+
+      '<span class="m-pill">'+aristas+' aristas</span>'+
+      '<span class="m-pill v">'+est.vivo+' vivos</span>'+
+      '<span class="m-pill o">'+est.obra+' en obra</span>'+
+      '<span class="m-pill i">'+est.idea+' frontera</span>'+
+    '</div>'+
+    '<div class="m-nota">'+META.nota+'</div>'+
+    '<div class="m-sep"></div>'+
+    '<div class="m-t">Último merge en main</div>'+
+    '<div class="m-sub"><span class="m-pr">'+META.merge.pr+'</span> '+META.merge.titulo+'</div>'+
+    '<div class="m-commit">'+META.merge.hash+' · '+fmt(META.merge.fecha)+'</div>'+
+    (stale
+      ? '<div class="m-flag warn">⚠ '+META.pendientes+' merge'+(META.pendientes===1?'':'s')+
+        ' entraron a main después de esta versión del mapa. Puede haber cosas construidas que acá todavía no figuran.</div>'
+      : '<div class="m-flag ok">✓ El mapa está al día con main.</div>');
+}
+document.getElementById('meta-chip').onclick=e=>{ e.stopPropagation(); metaBox.classList.toggle('open'); };
+document.addEventListener('click', e=>{ if(!metaBox.contains(e.target)) metaBox.classList.remove('open'); });
+renderMeta();
+
+// ─── pista de primer uso (sólo en pantalla chica) ───
+const hintEl=document.getElementById('hint');
+let hintTimer=null;
+function hideHint(){ if(hintEl.classList.contains('show')){ hintEl.style.opacity='0';
+  setTimeout(()=>hintEl.classList.remove('show'),300); } if(hintTimer) clearTimeout(hintTimer); }
+if(sheetMode()){
+  legendEl.classList.add('collapsed'); legendTab.classList.add('show');
+  hintEl.classList.add('show');
+  hintTimer=setTimeout(hideHint, 6000);
+}
+
+// ─── reencuadrar al girar el teléfono ───
+let rzT=null;
+addEventListener('resize', ()=>{ clearTimeout(rzT); rzT=setTimeout(()=>{ applyTipMode(); fit(); }, 220); });
+
 render("root");
+fit();
 </script>
 </body>
 </html>
