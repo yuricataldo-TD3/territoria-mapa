@@ -558,9 +558,9 @@ const VISTAS = {
       voz: { x:100, y:110, ic:"🎙️", label:"Gestión por voz", rol:"Vendedor", estado:"obra", madurez:3, drill:null,
         necesidad:"Al salir de una visita el vendedor está caminando, con las manos ocupadas. Escribir es la última fricción que queda; hablar no lo es.",
         definicion:"Dictar la visita — 'cerré en Don Pollo, pedido de 12 cajas, vuelvo el jueves' — y que salga una gestión estructurada, con resultado, nota y próximo contacto.",
-        como:"Dejó de ser frontera: el micrófono ya vive en la cabecera del sheet (#147, #154) y graba a una cola en IndexedDB (F1, #144). Las Edge Functions transcribir-gestion y extraer-gestion están escritas (F2, #128). El motor que las llama está en la rama feat/voz-fase-b-motor, sin mergear.",
-        resultado:"(esperado) Registrar una visita hablando diez segundos. Es la palanca de IA más importante del producto, y por primera vez hay algo construido.",
-        ruido:"Hoy graba y encola, nada más: nadie transcribe ni guarda. Falta mergear el motor y construir la tarjeta de confirmación, que ni siquiera tiene spec. Además solo lo ve platform_admin (flag useVozHabilitada)." },
+        como:"El micrófono vive en la cabecera del sheet (#147, #154) y graba a una cola en IndexedDB (F1, #144). Las Edge Functions transcribir-gestion y extraer-gestion (F2, #128) ya están conectadas a esa cola: el motor que las llama entró a main (#158) — antes estaba en una rama sin mergear.",
+        resultado:"(esperado) Registrar una visita hablando diez segundos. Es la palanca de IA más importante del producto, y cada vez hay más construido.",
+        ruido:"El motor ya transcribe y extrae de verdad, pero sin tarjeta: nada en pantalla muestra el resultado ni lo convierte en gestión guardada — esa tarjeta ni siquiera tiene spec todavía. Además solo lo ve platform_admin (flag useVozHabilitada)." },
       cotizador: { x:1090, y:150, ic:"🧾", label:"Cotizador", rol:"Vendedor", estado:"idea", madurez:1, drill:null,
         necesidad:"Cuando el cliente se interesa en la visita, el vendedor necesita armar y mostrar una cotización al momento — no volver a la oficina.",
         definicion:"El armador de cotizaciones: elegir los productos del partner, calcular el total y dejarle una propuesta formal al cliente.",
@@ -803,10 +803,18 @@ const VISTAS = {
         como:"Escrito y completo en el repo — migración de 577 líneas y su rollback (#149) — pero el propio commit avisa en el título que NO está aplicado en producción. F1 y F3 sí se aplicaron; este no.",
         resultado:"(esperado) La propiedad del negocio deja de ser una cortesía de la pantalla y pasa a ser una garantía del sistema.",
         ruido:"Hoy la propiedad se sostiene solo en la interfaz: cualquier miembro autenticado de la organización podría pisar un local ajeno por API. La spec que exige probar el rollback antes de aplicar no aparece en ningún repo." },
+      contexto: { x:490, y:560, ic:"🧾", label:"Contexto comercial en el chat", rol:"Vendedor · Líder", estado:"vivo", madurez:1, drill:null,
+        necesidad:"Un aviso de sistema que solo dice 'cambió de etapa' no sirve para retomar la conversación — hay que salir a la ficha para saber qué pasó de verdad, y esa fricción es exactamente lo que el chat debería evitar.",
+        definicion:"Cuando una gestión deja rastro en el hilo, la tarjeta muestra quién la hizo, en qué etapa quedó y el resumen comercial — no un aviso genérico.",
+        como:"Lector tipado de datos_extra (nunca lanza, degrada ante cualquier forma inesperada) + ChatSystemDivider enriquecido + autor real vía get_org_profiles_directory. PR #160, mergeado el 23-ago. Sin migración: lee un campo que la gestión ya guardaba, no agrega tabla nueva.",
+        resultado:"El vendedor y el líder retoman la conversación sin salir del chat a buscar qué pasó.",
+        ruido:null },
     },
     edges: [
       { from:"bandeja", to:"buscar", lbl:"buscar en el hilo", crit:"sec",
         nota:"La búsqueda no es una pantalla aparte: vive dentro de la bandeja. Sin la bandeja hay mensajes, pero no hay dónde buscarlos." },
+      { from:"buscar", to:"contexto", lbl:"y ahora se ve sin buscar", crit:"sec",
+        nota:"Buscar recupera contexto viejo escarbando. La tarjeta muestra el contexto de la última gestión sin que nadie tenga que ir a buscarlo." },
       { from:"bandeja", to:"propiedad", lbl:"de quién es", crit:"vital",
         nota:"La bandeja es donde el vendedor se topa con locales que no son suyos. Ahí es donde la propiedad tiene que ser visible, o la pelea empieza igual." },
       { from:"propiedad", to:"tomar", lbl:"si está libre, se toma", crit:"vital",
@@ -1128,17 +1136,17 @@ const VISTAS = {
 // Los conteos NO se hornean: se calculan solos desde VISTAS más abajo.
 // ─────────────────────────────────────────────────────────────
 const META = {
-  version:     "v0.8",
-  actualizado: "2026-08-20",
-  nota:        "El Chat abrió mundo propio y la Dirección Territorial estrenó el mundo del Dueño. La voz dejó de ser frontera y pasó a obra. Corregido: invitar por email no está desplegado.",
+  version:     "v0.9",
+  actualizado: "2026-08-23",
+  nota:        "Chat: nuevo nodo — el contexto comercial ya se lee dentro del hilo, no solo en la ficha. El motor de voz entró a main (ya transcribe y extrae); sigue en obra porque no tiene tarjeta que guarde la gestión.",
   merge: {
-    pr:      "#161",
-    hash:    "cc3924c",
+    pr:      "#160",
+    hash:    "4c374d0",
     fecha:   "2026-08-23",
-    titulo:  "feat(voz): banco de pruebas de la extracción"
+    titulo:  "docs(chat-p5): reporte de implementacion"
   },
   // merges que entraron a main DESPUÉS de la última actualización del mapa
-  pendientes: 3
+  pendientes: 0
 };
 
 const MAD_LBL = { 1:"reglas", 2:"patrones", 3:"IA" };
