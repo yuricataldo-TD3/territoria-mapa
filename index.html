@@ -447,7 +447,7 @@ const VISTAS = {
       mapa: { x:130, y:320, ic:"🗺️", label:"Mapa de locales", rol:"Compartido · Vendedor/Líder", estado:"vivo", madurez:1, drill:"mapaLocales",
         necesidad:"El vendedor necesita ver dónde están sus clientes y prospectos, no una lista plana.",
         definicion:"El mapa (/ruta) con los locales geolocalizados, filtrados por rubro y estado.",
-        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local, leído desde una única fuente (src/domain/estadoLocal.ts, #173) tras limpiar el dashboard viejo que ya no se usaba (#172). Desde el 28-ago (#180) son 9 estados, no 6: 'Interesado' pasa a llamarse 'Oportunidad' en pantalla (mismo dato por debajo) y se suman 'Pospuesto' y 'Lista negra', cada uno con su color propio en la leyenda.",
+        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local, leído desde una única fuente (src/domain/estadoLocal.ts, #173) tras limpiar el dashboard viejo que ya no se usaba (#172). Desde el 28-ago (#180) son 10 estados, no 7 (verificado contra el enum real de prod, no contra el array de la UI — 'sin_gestionar' también tiene pin propio): 'Interesado' pasa a llamarse 'Oportunidad' en pantalla (mismo dato por debajo) y se suman 'Pospuesto' y 'Lista negra', cada uno con su color propio en la leyenda.",
         resultado:"El vendedor ve su territorio de un vistazo, con el estado real de cada cliente, y decide a quién visitar en contexto geográfico.",
         ruido:null },
       checkin: { x:490, y:320, ic:"📍", label:"Check-in / Registrar gestión", rol:"Vendedor", estado:"vivo", madurez:1, drill:"checkin",
@@ -1149,7 +1149,7 @@ const VISTAS = {
 const META = {
   version:     "v1.0",
   actualizado: "2026-08-30",
-  nota:        "Estados del local: 6→9 (suma Oportunidad, Pospuesto, Lista negra) con motivo de salida tipado — ya en prod. Debajo del check-in, las tareas pasan a ser una tabla propia (verificada en prod), pero sin pantalla que la use todavía. Chat suma un panel de contexto de negocio en escritorio.",
+  nota:        "Estados del local: 7→10 en la base (suma pospuesto, baja y lista_negra) con motivo de salida tipado de 27 opciones — verificado en prod el 30-ago. Ojo: «Oportunidad» es una etiqueta de pantalla, no un estado nuevo. Debajo del check-in, las tareas pasan a ser una tabla propia (verificada en prod), pero sin pantalla que la use todavía. Chat suma un panel de contexto de negocio en escritorio.",
   merge: {
     pr:      "#184",
     hash:    "b30ff7f",
