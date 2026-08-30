@@ -87,10 +87,11 @@
 
   /* chrome */
   #hud{position:fixed;top:16px;left:18px;right:18px;z-index:45;
-    display:grid;grid-template-columns:1fr auto;column-gap:18px;align-items:start}
+    display:grid;grid-template-columns:1fr auto;column-gap:18px;align-items:start;
+    pointer-events:none}
   #hud h1{font-size:16px;font-weight:800;letter-spacing:-.02em;grid-column:1}
   #hud .sub{grid-column:1}
-  #hud #meta{grid-column:2;grid-row:1 / span 2}
+  #hud #meta{grid-column:2;grid-row:1 / span 2;pointer-events:auto}
   #hud .sub{font-size:11.5px;color:var(--tinta-3);margin-top:2px;max-width:52ch}
   #crumb{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:40;
     display:flex;align-items:center;gap:7px;background:var(--panel);
@@ -144,6 +145,7 @@
   #meta-chip:hover{border-color:var(--cable-activo);color:var(--tinta)}
   #meta-chip .pip{width:7px;height:7px;border-radius:50%;background:var(--vivo);flex:none}
   #meta-chip .pip.stale{background:var(--obra);box-shadow:0 0 0 3px var(--obra-glow)}
+  #meta-chip .pip.vieja{background:var(--ruido);box-shadow:0 0 0 3px var(--ruido-glow)}
   #meta-chip .caret{color:var(--tinta-3);font-size:9px;transition:transform .15s}
   #meta.open #meta-chip .caret{transform:rotate(180deg)}
   #meta-panel{width:300px;background:var(--panel);border:1px solid var(--linea);
@@ -162,6 +164,7 @@
     font-size:11px;line-height:1.5}
   #meta-panel .m-flag.warn{background:rgba(217,164,6,.12);border:1px solid rgba(217,164,6,.38);color:#e8c15a}
   #meta-panel .m-flag.ok{background:rgba(47,158,68,.1);border:1px solid rgba(47,158,68,.32);color:#7fc98f}
+  #meta-panel .m-flag.vieja{background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.4);color:#ff9ea1}
   #meta-panel .m-cnt{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
   #meta-panel .m-pill{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px;
     border:1px solid var(--linea);color:var(--tinta-2)}
@@ -231,7 +234,7 @@
   <div class="sub">Las líneas gruesas y brillantes son <b style="color:#8fdcff">arterias vitales</b> · pasá el mouse por un nodo o una línea para el detalle · qué entró en esta versión, en el cuadro de la derecha ▸</div>
   <div id="meta">
     <button id="meta-chip" title="Versión del mapa y último merge">
-      <span class="pip" id="meta-pip"></span><span id="meta-chip-txt">v0.8</span><span class="caret">▼</span>
+      <span class="pip" id="meta-pip"></span><span id="meta-chip-txt">versión</span><span class="caret">▼</span>
     </button>
     <div id="meta-panel"></div>
   </div>
@@ -444,14 +447,14 @@ const VISTAS = {
       mapa: { x:130, y:320, ic:"🗺️", label:"Mapa de locales", rol:"Compartido · Vendedor/Líder", estado:"vivo", madurez:1, drill:"mapaLocales",
         necesidad:"El vendedor necesita ver dónde están sus clientes y prospectos, no una lista plana.",
         definicion:"El mapa (/ruta) con los locales geolocalizados, filtrados por rubro y estado.",
-        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local.",
-        resultado:"El vendedor ve su territorio de un vistazo y decide a quién visitar en contexto geográfico.",
+        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local, leído desde una única fuente (src/domain/estadoLocal.ts, #173) tras limpiar el dashboard viejo que ya no se usaba (#172). Desde el 28-ago (#180) son 9 estados, no 6: 'Interesado' pasa a llamarse 'Oportunidad' en pantalla (mismo dato por debajo) y se suman 'Pospuesto' y 'Lista negra', cada uno con su color propio en la leyenda.",
+        resultado:"El vendedor ve su territorio de un vistazo, con el estado real de cada cliente, y decide a quién visitar en contexto geográfico.",
         ruido:null },
       checkin: { x:490, y:320, ic:"📍", label:"Check-in / Registrar gestión", rol:"Vendedor", estado:"vivo", madurez:1, drill:"checkin",
         necesidad:"Registrar una visita tiene que ser instantáneo — si tarda, el vendedor no lo hace y el dato se pierde.",
-        definicion:"El registro de la visita: GPS y hora automáticos, resultado en 4 chips, nota y foto opcionales. Funciona offline.",
-        como:"RegistrarGestionSheet → cola en IndexedDB → sync a org_gestiones. Fuera de rango >200m no bloquea, solo etiqueta.",
-        resultado:"En 3 taps la visita queda registrada, aunque no haya señal. Es LA arteria: de acá sale todo el valor del líder.",
+        definicion:"El registro de la visita: GPS y hora automáticos, resultado en árbol de opciones según la etapa, nota y foto opcionales. Funciona offline.",
+        como:"RegistroGestionSheet → cola en IndexedDB → sync a org_gestiones. Fuera de rango >200m no bloquea, solo etiqueta.",
+        resultado:"En pocos taps la visita queda registrada, aunque no haya señal. Es LA arteria: de acá sale todo el valor del líder.",
         ruido:null },
       pendientes: { x:850, y:320, ic:"📌", label:"Pendientes", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
         necesidad:"El vendedor deja compromisos ('paso el jueves') que se olvidan si no quedan agendados en algún lado.",
@@ -489,8 +492,16 @@ const VISTAS = {
         como:"No existe todavía, pero las dos piezas ya están vivas: la agenda real (proximo_contacto_at vía get_agenda_snapshot_by_owner) y el canal de aviso (la campana). Falta el trabajo programado que las una. El viejo RecordatoriosInteligentes.tsx + whatsapp-reminders apuntan a 'actividades', una tabla que no existe.",
         resultado:"(esperado) El vendedor recibe el recordatorio del follow-up sin agendarlo a mano.",
         ruido:"Frontera cercana: dejó de ser 'roto sin arreglo'. Con la campana viva (#119) y la agenda sobre datos reales (#124), falta solo el disparador programado — y borrar antes el código huérfano." },
+      tareasObj: { x:1400, y:560, ic:"🗃️", label:"La tarea como objeto propio", rol:"Vendedor", estado:"obra", madurez:1, drill:null,
+        necesidad:"Hoy 'lo que prometiste' es una sola fecha suelta por local (se pisa sin dejar rastro, y nunca se cierra sola). Para que una tarea tenga responsable, historial y se traspase con el local cuando cambia de dueño, necesita ser una entidad propia, no un campo de fecha.",
+        definicion:"Una tabla de tareas de verdad: tipo, título, vencimiento, responsable, estado y motivo de cierre — en vez de un timestamp anónimo.",
+        como:"org_tareas + sus RPCs (abrir_tarea, cerrar_tarea) + triggers que la mantienen sincronizada con el campo viejo y la cierran sola cuando el local se pierde/da de baja, y un backfill que ya migró los pendientes existentes — las 6 migraciones (#181), aplicadas y verificadas en prod con llamadas reales, no solo compiladas. Pero cero pantalla y cero llamador la usan todavía (0 resultados de abrir_tarea en todo src/): el camino que el vendedor usa hoy sigue siendo el de siempre (ver 'Pendientes'), que por debajo ahora escribe también acá vía trigger, en un solo sentido.",
+        resultado:"(esperado) Cada compromiso con responsable propio, historial y traspaso automático cuando el local cambia de dueño.",
+        ruido:"Falta el otro PR, obligatorio antes de llamar esto terminado: que el check-in escriba acá directamente (hoy solo el espejo pasivo del trigger lo alimenta) y una pantalla que lo muestre. Sin eso, la tabla existe y funciona pero nadie la usa todavía." },
     },
     edges: [
+      { from:"pendientes", to:"tareasObj", lbl:"hoy solo espejo pasivo", crit:"sec",
+        nota:"El trigger nuevo copia proximo_contacto_at hacia la tabla de tareas en un sentido, pero nada de la pantalla escribe ni lee la tabla nueva todavía — el camino real sigue siendo el de siempre." },
       { from:"ruta", to:"checkin", lbl:"lleva a la visita", crit:"vital",
         nota:"Sin la ruta priorizada, el vendedor no sabe a quién hacerle check-in. La ruta abre la visita." },
       { from:"checkin", to:"progreso", lbl:"suma al avance", crit:"vital",
@@ -519,12 +530,12 @@ const VISTAS = {
   checkin: {
     titulo: "Check-in", parent:"miDia",
     nodes: {
-      resultado: { x:100, y:260, ic:"☑️", label:"Resultado (4 chips)", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
-        necesidad:"El vendedor tiene que decir qué pasó en la visita en un solo toque — cualquier fricción y no lo registra.",
-        definicion:"Los 4 resultados: Pedido/Cierre 🤝, Interesado 👍, No estaba 🚪, No interesado 👎. Único toque obligatorio del check-in.",
-        como:"QuePaso en RegistrarGestionSheet. calcularEstadoPost mapea el chip al nuevo estado del local (pedido → cliente).",
-        resultado:"En un tap queda registrado qué pasó, y el estado del cliente se actualiza solo.",
-        ruido:null },
+      resultado: { x:100, y:260, ic:"☑️", label:"Resultado (árbol de pilares)", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+        necesidad:"El vendedor tiene que decir qué pasó en la visita en pocos toques — cualquier fricción y no lo registra. Pero un solo botón no alcanza para decir POR QUÉ se cae un cliente, y sin ese motivo el líder no puede actuar.",
+        definicion:"El resultado como un árbol de opciones que cambia según la etapa del local (3-4 pilares por etapa, con subopciones y a veces un tercer nivel) — y si el destino es Baja o Perdido, un motivo tipado obligatorio (27 valores posibles, nunca texto libre).",
+        como:"src/components/map/RegistroGestionSheet.tsx + src/types/gestionPilares.ts — 'el sheet unificado'. Entró a main el 23-ago (PR #164) titulado 'preview para evaluar, NO mergear', pero Mi Día lo monta hoy sin ningún flag ni rol especial: reemplazó de hecho al sheet viejo (mi-dia/RegistrarGestionSheet.tsx, que quedó en el repo pero ya nadie lo importa). El motivo tipado obligatorio (MarcarNoExisteDialog + el propio árbol) y 2 pilares nuevos (Pospuesto, Baja) llegaron el 28-ago (#180), sobre una capa de datos ya verificada en prod (#174/#178/#179).",
+        resultado:"En pocos toques queda registrado qué pasó y por qué, sin poder inventar un motivo que no sea uno de los tipados — y el estado del cliente se actualiza solo.",
+        ruido:"El componente que corre hoy en producción viene de un PR cuyo propio título pedía NO mergear todavía — vale que Yuri confirme con Diego si el salto de 'evaluar' a 'en manos de todos los vendedores' fue una decisión tomada, o un accidente de proceso (no pasó por el mockup-previo habitual)." },
       proximo: { x:470, y:110, ic:"📅", label:"Próximo contacto", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
         necesidad:"Si no se agenda la próxima visita en el momento, se olvida — y el cliente se enfría.",
         definicion:"Cuándo volver a este cliente. Se calcula del resultado, o el vendedor lo fija a mano.",
@@ -558,7 +569,7 @@ const VISTAS = {
       voz: { x:100, y:110, ic:"🎙️", label:"Gestión por voz", rol:"Vendedor", estado:"obra", madurez:3, drill:null,
         necesidad:"Al salir de una visita el vendedor está caminando, con las manos ocupadas. Escribir es la última fricción que queda; hablar no lo es.",
         definicion:"Dictar la visita — 'cerré en Don Pollo, pedido de 12 cajas, vuelvo el jueves' — y que salga una gestión estructurada, con resultado, nota y próximo contacto.",
-        como:"El micrófono vive en la cabecera del sheet (#147, #154) y graba a una cola en IndexedDB (F1, #144). Las Edge Functions transcribir-gestion y extraer-gestion (F2, #128) ya están conectadas a esa cola: el motor que las llama entró a main (#158) — antes estaba en una rama sin mergear.",
+        como:"El micrófono vive en la cabecera del sheet (#147, #154) y graba a una cola en IndexedDB (F1, #144). Las Edge Functions transcribir-gestion y extraer-gestion (F2, #128) ya están conectadas a esa cola: el motor que las llama entró a main (#158) — antes estaba en una rama sin mergear. Desde entonces solo afinación: el techo de tokens de extraer-gestion subió de 900 a 1600 tras encontrar casos reales truncados (#166), y la lista de SaaS/POS que ayuda a la transcripción a reconocer nombres sumó Fudo y 'Tu punto de venta' (#183).",
         resultado:"(esperado) Registrar una visita hablando diez segundos. Es la palanca de IA más importante del producto, y cada vez hay más construido.",
         ruido:"El motor ya transcribe y extrae de verdad, pero sin tarjeta: nada en pantalla muestra el resultado ni lo convierte en gestión guardada — esa tarjeta ni siquiera tiene spec todavía. Además solo lo ve platform_admin (flag useVozHabilitada)." },
       cotizador: { x:1090, y:150, ic:"🧾", label:"Cotizador", rol:"Vendedor", estado:"idea", madurez:1, drill:null,
@@ -770,8 +781,8 @@ const VISTAS = {
       bandeja: { x:130, y:110, ic:"📥", label:"Bandeja accionable", rol:"Vendedor · Líder", estado:"vivo", madurez:1, drill:null,
         necesidad:"Una lista de conversaciones que solo crece no es una herramienta de trabajo: el vendedor no sabe cuál sigue abierta y cuál ya se resolvió.",
         definicion:"La bandeja de chats como lista de pendientes: cada hilo se puede cerrar cuando el asunto terminó, y deja de estorbar.",
-        como:"PR #130, mergeado el 16-ago. Cierre de conversaciones sobre el módulo de chat de Diego.",
-        resultado:"El vendedor abre el chat y ve lo que le falta hacer, no todo lo que hizo alguna vez.",
+        como:"PR #130, mergeado el 16-ago. Cierre de conversaciones sobre el módulo de chat de Diego. Desde el 24-ago (#168) los filtros son un rail vertical en escritorio, con un contador por cada fila (antes solo la agenda tenía número, la etapa no) — de paso se corrigió un contador viejo que no respetaba la búsqueda activa.",
+        resultado:"El vendedor abre el chat y ve lo que le falta hacer, no todo lo que hizo alguna vez — y en escritorio, cuánto hay en cada bandeja de un vistazo.",
         ruido:null },
       buscar: { x:130, y:340, ic:"🔍", label:"Buscar en el historial", rol:"Vendedor · Líder", estado:"vivo", madurez:1, drill:null,
         necesidad:"Lo que se habló con un cliente hace tres semanas es contexto de venta, pero si no se puede encontrar, es como si no existiera.",
@@ -806,8 +817,8 @@ const VISTAS = {
       contexto: { x:490, y:560, ic:"🧾", label:"Contexto comercial en el chat", rol:"Vendedor · Líder", estado:"vivo", madurez:1, drill:null,
         necesidad:"Un aviso de sistema que solo dice 'cambió de etapa' no sirve para retomar la conversación — hay que salir a la ficha para saber qué pasó de verdad, y esa fricción es exactamente lo que el chat debería evitar.",
         definicion:"Cuando una gestión deja rastro en el hilo, la tarjeta muestra quién la hizo, en qué etapa quedó y el resumen comercial — no un aviso genérico.",
-        como:"Lector tipado de datos_extra (nunca lanza, degrada ante cualquier forma inesperada) + ChatSystemDivider enriquecido + autor real vía get_org_profiles_directory. PR #160, mergeado el 23-ago. Sin migración: lee un campo que la gestión ya guardaba, no agrega tabla nueva.",
-        resultado:"El vendedor y el líder retoman la conversación sin salir del chat a buscar qué pasó.",
+        como:"Lector tipado de datos_extra (nunca lanza, degrada ante cualquier forma inesperada) + ChatSystemDivider enriquecido + autor real vía get_org_profiles_directory. PR #160, mergeado el 23-ago. Sin migración: lee un campo que la gestión ya guardaba, no agrega tabla nueva. Desde el 23-ago (#165) el chat en escritorio (standalone, no embebido en Ruta) suma una tercera columna fija con el mismo contexto — de quién es el negocio, etapa, contactos, historial y próximo contacto — más los atajos para registrar una gestión o ver el mapa sin salir del hilo.",
+        resultado:"El vendedor y el líder retoman la conversación sin salir del chat a buscar qué pasó — y en escritorio, sin perder de vista el contexto mientras conversan.",
         ruido:null },
     },
     edges: [
@@ -1136,14 +1147,14 @@ const VISTAS = {
 // Los conteos NO se hornean: se calculan solos desde VISTAS más abajo.
 // ─────────────────────────────────────────────────────────────
 const META = {
-  version:     "v0.9",
-  actualizado: "2026-08-23",
-  nota:        "Chat: nuevo nodo — el contexto comercial ya se lee dentro del hilo, no solo en la ficha. El motor de voz entró a main (ya transcribe y extrae); sigue en obra porque no tiene tarjeta que guarde la gestión.",
+  version:     "v1.0",
+  actualizado: "2026-08-30",
+  nota:        "Estados del local: 6→9 (suma Oportunidad, Pospuesto, Lista negra) con motivo de salida tipado — ya en prod. Debajo del check-in, las tareas pasan a ser una tabla propia (verificada en prod), pero sin pantalla que la use todavía. Chat suma un panel de contexto de negocio en escritorio.",
   merge: {
-    pr:      "#160",
-    hash:    "4c374d0",
-    fecha:   "2026-08-23",
-    titulo:  "docs(chat-p5): reporte de implementacion"
+    pr:      "#184",
+    hash:    "b30ff7f",
+    fecha:   "2026-08-29",
+    titulo:  "chore(pipeline): v4.3 - semaforo de 4 colores + sobre de autoridad + guardas deterministas (F1-F6)"
   },
   // merges que entraron a main DESPUÉS de la última actualización del mapa
   pendientes: 0
@@ -1439,10 +1450,21 @@ function renderMeta(){
     const [y,m,d]=iso.split('-');
     return parseInt(d,10)+' '+M[parseInt(m,10)-1]+' '+y;
   };
-  const stale=META.pendientes>0;
+  // La frescura NO puede depender sólo de un número horneado: ese número no envejece.
+  // Se combina con los días transcurridos desde la última sincronización, que sí envejecen solos.
+  const [ay,am,ad]=META.actualizado.split('-').map(Number);
+  const dias=Math.max(0, Math.floor((Date.now()-new Date(ay,am-1,ad).getTime())/86400000));
+  const sync = META.pendientes>0
+    ? {nivel:'warn', txt:'⚠ '+META.pendientes+' merge'+(META.pendientes===1?'':'s')+
+        ' entraron a main después de esta versión del mapa. Puede haber cosas construidas que acá todavía no figuran.'}
+    : dias>=7
+      ? {nivel:'vieja', txt:'⚠ Hace '+dias+' días que el mapa no se sincroniza con main. Es muy probable que esté desactualizado — corré <b>/mapa-sync</b>.'}
+      : dias>=2
+        ? {nivel:'warn', txt:'Sincronizado hace '+dias+' días. Puede haber merges nuevos que acá no figuran: el mapa no puede verlos solo.'}
+        : {nivel:'ok', txt:'✓ El mapa está al día con main.'};
   document.getElementById('meta-chip-txt').textContent=
     META.version+' · main '+META.merge.pr;
-  document.getElementById('meta-pip').className='pip'+(stale?' stale':'');
+  document.getElementById('meta-pip').className='pip'+(sync.nivel==='ok'?'':sync.nivel==='vieja'?' vieja':' stale');
   document.getElementById('meta-panel').innerHTML=
     '<div class="m-t">Este mapa</div>'+
     '<div class="m-big">'+META.version+'</div>'+
@@ -1460,10 +1482,8 @@ function renderMeta(){
     '<div class="m-t">Último merge en main</div>'+
     '<div class="m-sub"><span class="m-pr">'+META.merge.pr+'</span> '+META.merge.titulo+'</div>'+
     '<div class="m-commit">'+META.merge.hash+' · '+fmt(META.merge.fecha)+'</div>'+
-    (stale
-      ? '<div class="m-flag warn">⚠ '+META.pendientes+' merge'+(META.pendientes===1?'':'s')+
-        ' entraron a main después de esta versión del mapa. Puede haber cosas construidas que acá todavía no figuran.</div>'
-      : '<div class="m-flag ok">✓ El mapa está al día con main.</div>');
+    '<div class="m-flag '+sync.nivel+'">'+sync.txt+'</div>' +
+    (dias>=2 ? '<div class="m-commit" style="margin-top:7px">Última sincronización: hace '+dias+' día'+(dias===1?'':'s')+'</div>' : '');
 }
 document.getElementById('meta-chip').onclick=e=>{ e.stopPropagation(); metaBox.classList.toggle('open'); };
 document.addEventListener('click', e=>{ if(!metaBox.contains(e.target)) metaBox.classList.remove('open'); });
