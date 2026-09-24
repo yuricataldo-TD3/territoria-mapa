@@ -455,7 +455,7 @@ const VISTAS = {
       mapa: { x:130, y:320, ic:"🗺️", label:"Mapa de locales", rol:"Compartido · Vendedor/Líder", estado:"vivo", madurez:1, drill:"mapaLocales",
         necesidad:"El vendedor necesita ver dónde están sus clientes y prospectos, no una lista plana.",
         definicion:"El mapa (/ruta) con los locales geolocalizados, filtrados por rubro y estado.",
-        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local, leído desde una única fuente (src/domain/estadoLocal.ts, #173). Desde el 28-ago (#180) son 10 estados, no 7 (verificado contra el enum real de prod): 'Interesado' pasa a llamarse 'Oportunidad' en pantalla y se suman 'Pospuesto' y 'Lista negra'. Piel v1 (#224, 8-sep) rehizo la identidad visual del mapa (tinta + azul, pines en gota) y cerró la paleta de colores por estado (#226, 9-sep). El encuadre corrigió dos bugs reales: abría mostrando toda la región sin GPS (#220) y, con la cartera concentrada en una comuna pero un outlier lejano, el centro caía a mitad de camino entre los dos en vez de en la masa real (#228, 24-sep).",
+        como:"Google Maps + locales/org_locales_estado. Módulo de Diego. Pines por estado del local, leído desde una única fuente (src/domain/estadoLocal.ts, #173). Desde el 28-ago (#180) son 10 estados, no 7 (verificado contra el enum real de prod): 'Interesado' pasa a llamarse 'Oportunidad' en pantalla y se suman 'Pospuesto' y 'Lista negra'. Piel v1 (#224, 8-sep) rehizo la identidad visual del mapa (tinta + azul, pines en gota). El 24-sep, en el mismo día, se cerraron dos frentes más: la paleta de colores por estado (#226 — verificado en el código real: prospecto #4A8CC7, contactado #B07A00, pospuesto #6B4E9B ya no comparte hex con contactado) y el encuadre por masa (#228), que corrigió dos bugs reales: abría mostrando toda la región sin GPS (#220) y, con la cartera concentrada en una comuna pero un outlier lejano, el centro caía a mitad de camino entre los dos en vez de en la masa real. Corrección propia (25-sep): la primera versión de este nodo databa #226 el 9-sep, cuando en realidad esa rama recién mergeó el 24-sep — quedó corregido contra el commit real, no contra la fecha de creación del PR.",
         resultado:"El vendedor ve su territorio de un vistazo, con el estado real de cada cliente, y decide a quién visitar en contexto geográfico.",
         ruido:null },
       checkin: { x:490, y:320, ic:"📍", label:"Check-in / Registrar gestión", rol:"Vendedor", estado:"vivo", madurez:1, drill:"checkin",
@@ -586,11 +586,11 @@ const VISTAS = {
   checkin: {
     titulo: "Check-in", parent:"miDia",
     nodes: {
-      resultado: { x:100, y:260, ic:"☑️", label:"Resultado (árbol de pilares)", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
+      resultado: { x:100, y:260, ic:"☑️", label:"Resultado (lista plana por etapa)", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
         necesidad:"El vendedor tiene que decir qué pasó en la visita en pocos toques — cualquier fricción y no lo registra. Pero un solo botón no alcanza para decir POR QUÉ se cae un cliente, y sin ese motivo el líder no puede actuar.",
-        definicion:"El resultado como un árbol de opciones que cambia según la etapa del local (3-4 pilares por etapa, con subopciones y a veces un tercer nivel) — y si el destino es Baja, Perdido o Pospuesto, un motivo tipado obligatorio (36 valores posibles entre los 4 destinos, nunca texto libre). Cierra al toque: la ventana de 'Deshacer' pasó a ser un toast fuera de la hoja, no una tarjeta que bloquea el sheet.",
-        como:"src/components/map/RegistroGestionSheet.tsx + src/types/gestionPilares.ts — 'el sheet unificado'. El 23-sep (#188) se blindó oficialmente: se borró el sheet viejo (mi-dia/RegistrarGestionSheet.tsx) y el comentario en el código dice explícito 'vigente desde el #164, no un preview' — cierra la duda que este nodo dejaba abierta en la v1.0. 9 motivos nuevos (7 de pausa + 2 de perdido) y el CHECK de coherencia motivo/estado llegaron el 6-sep (#218/#219).",
-        resultado:"En pocos toques queda registrado qué pasó y por qué, sin poder inventar un motivo que no sea uno de los tipados — y el estado del cliente se actualiza solo.",
+        definicion:"El árbol se podó (SPEC 4 completa, D0-D4, #222, 24-sep): un solo Pilar por etapa, sin Nivel 0 que elegir — lista plana de ramas accionables agrupadas por encabezado, 79 en total (no 84: 5 se sacaron a propósito). La regla dura: toda gestión guardada deja el local con tarea viva o con motivo de salida tipado — nunca en un tercer estado ambiguo. Si el destino crea una tarea, la fecha (día+hora) viene SIEMPRE precargada y visible, un solo toque para aceptarla.",
+        como:"src/components/map/RegistroGestionSheet.tsx + src/types/gestionPilares.ts — 'el sheet unificado', blindado oficialmente desde el #188 (23-sep). Verificado en el código real, no en el título del PR: dispatchPilares() devuelve un array de un solo elemento para las 9 etapas, sin excepción — el 'modo plano' no es una rama condicional, es el único camino. 9 motivos nuevos (7 de pausa + 2 de perdido) y el CHECK de coherencia motivo/estado llegaron el 6-sep (#218/#219).",
+        resultado:"En pocos toques queda registrado qué pasó y por qué, sin poder inventar un motivo que no sea uno de los tipados — y el estado del cliente se actualiza solo, siempre con una tarea o un cierre, nunca en el limbo.",
         ruido:null },
       proximo: { x:470, y:110, ic:"📅", label:"Próximo contacto", rol:"Vendedor", estado:"vivo", madurez:1, drill:null,
         necesidad:"Si no se agenda la próxima visita en el momento, se olvida — y el cliente se enfría.",
@@ -1211,14 +1211,14 @@ const VISTAS = {
 // Los conteos NO se hornean: se calculan solos desde VISTAS más abajo.
 // ─────────────────────────────────────────────────────────────
 const META = {
-  version:     "v1.1",
+  version:     "v1.2",
   actualizado: "2026-09-24",
-  nota:        "Mundo nuevo: Agente Copiloto — arma el día, lo mantiene vivo, resuelve el primer día sin cartera y responde preguntas (4 nodos, vivo). Nodos nuevos: Mascota viva y Embudo de actividad. El candado de propiedad y La tarea como objeto propio pasan de obra a vivo, verificados contra prod, no contra el repo. 3.5 semanas de delta (30-ago a 24-sep, ~70 commits) — catch-up completo tras un hueco sin sincronizar.",
+  nota:        "El árbol se podó de verdad: un solo Pilar por etapa (no 3-4), 79 ramas, regla dura de tarea-o-motivo-de-salida (SPEC 4 completa, #222) — verificado en dispatchPilares(), no en el título del PR. Paleta de pines cerrada (#226) y security_invoker en v_locales_sin_categoria (#197). Corregida una fecha propia (v1.1 databa #226 el 9-sep; mergeó el 24-sep).",
   merge: {
-    pr:      "#238",
-    hash:    "06c384f",
+    pr:      "#226",
+    hash:    "9848c7e",
     fecha:   "2026-09-24",
-    titulo:  "chore(commands): restaura /mapa-sync desde el brain"
+    titulo:  "feat(mapa): paleta de estados cerrada, Prospecto callado, pines especiales en gota"
   },
   // merges que entraron a main DESPUÉS de la última actualización del mapa
   pendientes: 0
